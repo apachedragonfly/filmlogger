@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Check, Film, RotateCcw, List, Download, FileSpreadsheet, Heart, Clock, Eye, ChevronLeft, Key, Loader2, Star, Filter, Layers, Trash2, AlertTriangle } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { X, Check, Film, RotateCcw, List, Download, FileSpreadsheet, Heart, Clock, Eye, ChevronLeft, Key, Loader2, Star, Filter, Layers, Trash2, AlertTriangle, Plus, Play, Settings2, FilePlus, ExternalLink, HelpCircle } from 'lucide-react';
 
 // --- CUSTOM LOGO COMPONENT ---
 const FilmLoggerIcon = ({ className }) => (
@@ -17,7 +17,7 @@ const FilmLoggerIcon = ({ className }) => (
   </svg>
 );
 
-// --- STATIC DATA (Built-in for Offline Mode) ---
+// --- STATIC DATA ---
 const STATIC_MOVIES = [
   { id: 1, title: "The Godfather", year: "1972", director: "Francis Ford Coppola", rating: 9.2, genre_ids: [80, 18], poster: "https://image.tmdb.org/t/p/w780/3bhkrj58Vtu7enYsRolD1fZdja1.jpg", overview: "Spanning the years 1945 to 1955, a chronicle of the fictional Italian-American Corleone crime family.", isStatic: true },
   { id: 2, title: "Pulp Fiction", year: "1994", director: "Quentin Tarantino", rating: 8.9, genre_ids: [53, 80], poster: "https://image.tmdb.org/t/p/w780/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg", overview: "The lives of two mob hitmen, a boxer, a gangster and his wife, and a pair of diner bandits intertwine in four tales.", isStatic: true },
@@ -39,15 +39,6 @@ const STATIC_MOVIES = [
   { id: 18, title: "Seven Samurai", year: "1954", director: "Akira Kurosawa", rating: 8.5, genre_ids: [28, 18], poster: "https://image.tmdb.org/t/p/w780/8OKmBV5BUFzmozICVEIn5nwWDDx.jpg", overview: "A samurai answers a village's request for protection after he falls on hard times. The town needs protection from bandits.", isStatic: true },
   { id: 19, title: "Back to the Future", year: "1985", director: "Robert Zemeckis", rating: 8.5, genre_ids: [12, 35, 878], poster: "https://image.tmdb.org/t/p/w780/fNOH9f1aA7XRTzl1sAOx9iF553Q.jpg", overview: "Marty McFly, a 17-year-old high school student, is accidentally sent thirty years into the past in a time-traveling DeLorean.", isStatic: true },
   { id: 20, title: "Spider-Man: Into the Spider-Verse", year: "2018", director: "Rodney Rothman", rating: 8.4, genre_ids: [28, 12, 16, 878], poster: "https://image.tmdb.org/t/p/w780/iiZZdoQBEYBv6id8su7ImL0oCbD.jpg", overview: "Teen Miles Morales becomes the Spider-Man of his universe, and must join with five spider-powered individuals from other dimensions.", isStatic: true },
-  { id: 21, title: "The Shining", year: "1980", director: "Stanley Kubrick", rating: 8.2, genre_ids: [27, 53], poster: "https://image.tmdb.org/t/p/w780/xmbU4JTUm8qAMqM8KMkHRr0uU65.jpg", overview: "Jack Torrance accepts a caretaker job at the Overlook Hotel, where he, along with his wife Wendy and their son Danny, must live isolated from the rest of the world.", isStatic: true },
-  { id: 22, title: "WALL·E", year: "2008", director: "Andrew Stanton", rating: 8.3, genre_ids: [16, 10751, 878], poster: "https://image.tmdb.org/t/p/w780/h1B7tW0t399VDjAcWbP8m8urSo4.jpg", overview: "WALL·E is the last robot left on an Earth that has been overrun with garbage and all humans have fled to outer space.", isStatic: true },
-  { id: 23, title: "Django Unchained", year: "2012", director: "Quentin Tarantino", rating: 8.1, genre_ids: [18, 37], poster: "https://image.tmdb.org/t/p/w780/7oWY8VDWW7thTzWh3OKQTFZrmN5.jpg", overview: "With the help of a German bounty hunter, a freed slave sets out to rescue his wife from a brutal Mississippi plantation owner.", isStatic: true },
-  { id: 24, title: "Alien", year: "1979", director: "Ridley Scott", rating: 8.1, genre_ids: [27, 878], poster: "https://image.tmdb.org/t/p/w780/vfrQk5IPloGg1v9Rzbh2Eg3VGyM.jpg", overview: "During its return to the earth, commercial spaceship Nostromo intercepts a distress signal from a distant planet.", isStatic: true },
-  { id: 25, title: "Oldboy", year: "2003", director: "Park Chan-wook", rating: 8.2, genre_ids: [18, 53, 9648], poster: "https://image.tmdb.org/t/p/w780/pWDtjs568Zf42BpMEwKxDwirIKp.jpg", overview: "With no clue how he came to be imprisoned, drugged and tortured for 15 years, a desperate businessman seeks revenge on his captors.", isStatic: true },
-  { id: 26, title: "Princess Mononoke", year: "1997", director: "Hayao Miyazaki", rating: 8.3, genre_ids: [12, 14, 16], poster: "https://image.tmdb.org/t/p/w780/cMyJU9UaMF84yI6YpCq170ZtN5P.jpg", overview: "Ashitaka, a prince of the disappearing Emishi people, is cursed by a demonized boar god and must journey to the west to find a cure.", isStatic: true },
-  { id: 27, title: "Coco", year: "2017", director: "Lee Unkrich", rating: 8.2, genre_ids: [16, 10751, 14, 10402], poster: "https://image.tmdb.org/t/p/w780/gGEsBPAijhVUFoiNpgZXqRVWJt2.jpg", overview: "Despite his family’s baffling generations-old ban on music, Miguel dreams of becoming an accomplished musician like his idol, Ernesto de la Cruz.", isStatic: true },
-  { id: 28, title: "Avengers: Infinity War", year: "2018", director: "Anthony Russo", rating: 8.2, genre_ids: [12, 28, 878], poster: "https://image.tmdb.org/t/p/w780/7WsyChQLEftFiDOVTGjy3PDTuE5.jpg", overview: "As the Avengers and their allies have continued to protect the world from threats too large for any one hero to handle, a new danger has emerged from the cosmic shadows: Thanos.", isStatic: true },
-  { id: 29, title: "Your Name.", year: "2016", director: "Makoto Shinkai", rating: 8.5, genre_ids: [10749, 16, 18], poster: "https://image.tmdb.org/t/p/w780/q719jXXEzOoYaps6babgKnONONX.jpg", overview: "High schoolers Mitsuha and Taki are complete strangers living separate lives. But one night, they suddenly switch places.", isStatic: true },
   { id: 30, title: "Top Gun: Maverick", year: "2022", director: "Joseph Kosinski", rating: 8.2, genre_ids: [28, 18], poster: "https://image.tmdb.org/t/p/w780/62HCnUTziyWcpDaBO2i1DX17ljH.jpg", overview: "After more than thirty years of service as one of the Navy’s top aviators, and dodging the advancement in rank that would ground him, Pete “Maverick” Mitchell finds himself training a detachment of TOP GUN graduates.", isStatic: true }
 ];
 
@@ -59,14 +50,24 @@ const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w780';
 const GENRES = [
     { id: 'all', label: 'All Genres' },
     { id: 28, label: 'Action' },
+    { id: 12, label: 'Adventure' },
     { id: 16, label: 'Animation' },
     { id: 35, label: 'Comedy' },
     { id: 80, label: 'Crime' },
+    { id: 99, label: 'Documentary' },
     { id: 18, label: 'Drama' },
+    { id: 10751, label: 'Family' },
     { id: 14, label: 'Fantasy' },
+    { id: 36, label: 'History' },
     { id: 27, label: 'Horror' },
+    { id: 10402, label: 'Music' },
+    { id: 9648, label: 'Mystery' },
+    { id: 10749, label: 'Romance' },
     { id: 878, label: 'Sci-Fi' },
+    { id: 10770, label: 'TV Movie' },
     { id: 53, label: 'Thriller' },
+    { id: 10752, label: 'War' },
+    { id: 37, label: 'Western' },
 ];
 
 const DECADES = [
@@ -76,17 +77,22 @@ const DECADES = [
     { id: '2000', label: '2000s' },
     { id: '1990', label: '1990s' },
     { id: '1980', label: '1980s' },
-    { id: 'old', label: 'Classics (<1980)' },
+    { id: '1970', label: '1970s' },
+    { id: '1960', label: '1960s' },
+    { id: '1950', label: '1950s' },
+    { id: '1940', label: '1940s' },
+    { id: 'old', label: 'Pre-1940' },
 ];
 
 const SORTS = [
+    { id: 'random', label: 'Random' },
     { id: 'popularity.desc', label: 'Most Popular' },
     { id: 'vote_average.desc', label: 'Top Rated' },
     { id: 'primary_release_date.desc', label: 'Newest' },
 ];
 
-// --- MODE CONFIGURATION ---
-const MODES = {
+// --- STANDARD MODES ---
+const STANDARD_MODES = {
   watched: {
     id: 'watched',
     label: 'Have you watched?',
@@ -108,70 +114,205 @@ const MODES = {
     yesBg: 'bg-blue-500',
     icon: <Clock size={24} />,
     themeColor: 'text-blue-500'
-  },
-  liked: {
-    id: 'liked',
-    label: 'Did you like it?',
-    yesLabel: 'LIKED',
-    noLabel: 'MEH',
-    yesColor: 'text-pink-400',
-    yesBorder: 'border-pink-400',
-    yesBg: 'bg-pink-500',
-    icon: <Heart size={24} />,
-    themeColor: 'text-pink-500'
   }
 };
 
+// Helper to get mode config (handles standard + custom)
+const getModeConfig = (modeId, customMeta) => {
+    if (STANDARD_MODES[modeId]) return STANDARD_MODES[modeId];
+    // Dynamic config for custom lists
+    return {
+        id: modeId,
+        label: customMeta?.[modeId]?.name || 'Custom List',
+        yesLabel: 'ADD',
+        noLabel: 'SKIP',
+        yesColor: 'text-purple-400',
+        yesBorder: 'border-purple-400',
+        yesBg: 'bg-purple-500',
+        icon: <List size={24} />,
+        themeColor: 'text-purple-500',
+        isCustom: true
+    };
+};
+
+// --- UTILITY: SEARCH PERSON ---
+const searchPersonByName = async (apiKey, name) => {
+  try {
+    const searchUrl = `${TMDB_BASE_URL}/search/person?api_key=${apiKey}&language=en-US&query=${encodeURIComponent(name)}`;
+    const searchRes = await fetch(searchUrl);
+    const searchData = await searchRes.json();
+    if (searchData.results && searchData.results.length > 0) {
+      return searchData.results[0].id;
+    }
+    return null;
+  } catch (e) {
+    console.error(`Error searching for person: ${name}`, e);
+    return null;
+  }
+};
+
+// --- UTILITY: SHUFFLE ---
+const shuffleArray = (array) => {
+  let shuffled = [...array];
+  const passes = Math.max(3, Math.floor(array.length / 10));
+  for (let pass = 0; pass < passes; pass++) {
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+  }
+  return shuffled;
+};
+
 // --- API UTILS ---
+// NEW: Fetch full filmography to avoid pagination issues with director filters
+const fetchFullDirectorFilmography = async (apiKey, personId, filters) => {
+    try {
+        const url = `${TMDB_BASE_URL}/person/${personId}/movie_credits?api_key=${apiKey}&language=en-US`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        // Filter for 'Director' job immediately
+        let movies = (data.crew || [])
+            .filter(m => m.job === 'Director')
+            .map(m => ({
+                id: m.id,
+                title: m.title,
+                year: m.release_date ? m.release_date.split('-')[0] : 'N/A',
+                poster_path: m.poster_path,
+                director: 'Selected Director', // We know the director
+                rating: m.vote_average,
+                overview: m.overview,
+                vote_count: m.vote_count,
+                genre_ids: m.genre_ids,
+                release_date: m.release_date,
+                isStatic: false
+            }));
+
+        // Apply Client-Side Filters
+        
+        // Lower vote count threshold for specific director searches (capture early/indie films)
+        movies = movies.filter(m => m.vote_count >= 10); 
+
+        // Genre
+        if (filters.genre !== 'all') {
+            movies = movies.filter(m => m.genre_ids && m.genre_ids.includes(Number(filters.genre)));
+        }
+
+        // Year
+        if (filters.year !== 'all') {
+            if (filters.year === 'old') {
+                movies = movies.filter(m => m.release_date && m.release_date < '1940-01-01');
+            } else {
+                const startYear = parseInt(filters.year);
+                const endYear = startYear + 9;
+                movies = movies.filter(m => {
+                    if (!m.release_date) return false;
+                    const y = parseInt(m.release_date.split('-')[0]);
+                    return y >= startYear && y <= endYear;
+                });
+            }
+        }
+
+        // Sort
+        if (filters.sort === 'random') {
+            movies = shuffleArray(movies);
+        } else if (filters.sort === 'vote_average.desc') {
+            movies.sort((a, b) => b.rating - a.rating);
+        } else if (filters.sort === 'primary_release_date.desc') {
+            movies.sort((a, b) => new Date(b.release_date || '') - new Date(a.release_date || ''));
+        } else {
+            // Popularity is default
+            movies.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        }
+
+        return movies;
+    } catch (e) {
+        console.error("Error fetching director credits", e);
+        return [];
+    }
+};
+
 const fetchWithCredits = async (apiKey, page = 1, filters) => {
   try {
-    // Construct API URL based on filters
-    let url = `${TMDB_BASE_URL}/discover/movie?api_key=${apiKey}&language=en-US&sort_by=${filters.sort}&page=${page}&vote_count.gte=200`;
-    
-    if (filters.genre !== 'all') {
-        url += `&with_genres=${filters.genre}`;
-    }
+    let allResults = [];
 
-    if (filters.year !== 'all') {
-        const currentYear = new Date().getFullYear();
-        if (filters.year === '2020') url += `&primary_release_date.gte=2020-01-01&primary_release_date.lte=${currentYear}-12-31`;
-        if (filters.year === '2010') url += `&primary_release_date.gte=2010-01-01&primary_release_date.lte=2019-12-31`;
-        if (filters.year === '2000') url += `&primary_release_date.gte=2000-01-01&primary_release_date.lte=2009-12-31`;
-        if (filters.year === '1990') url += `&primary_release_date.gte=1990-01-01&primary_release_date.lte=1999-12-31`;
-        if (filters.year === '1980') url += `&primary_release_date.gte=1980-01-01&primary_release_date.lte=1989-12-31`;
-        if (filters.year === 'old') url += `&primary_release_date.lte=1979-12-31`;
-    }
+    // DIRECTOR FILTER LOGIC (Load ALL movies at once on Page 1)
+    if (filters.directors && Array.isArray(filters.directors) && filters.directors.length > 0) {
+      // Only fetch on page 1. If page > 1, return empty to stop infinite scroll
+      if (page > 1) return [];
 
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (!data.results) throw new Error("Invalid API Response");
-
-    const enrichedMovies = await Promise.all(
-      data.results.map(async (movie) => {
-        try {
-          // Fetch credits for director
-          const creditRes = await fetch(`${TMDB_BASE_URL}/movie/${movie.id}/credits?api_key=${apiKey}`);
-          const creditData = await creditRes.json();
-          const director = creditData.crew?.find(p => p.job === 'Director')?.name || "Unknown";
-          
-          return {
-            id: movie.id,
-            title: movie.title,
-            year: movie.release_date ? movie.release_date.split('-')[0] : 'N/A',
-            poster_path: movie.poster_path,
-            director: director,
-            rating: movie.vote_average,
-            overview: movie.overview,
-            isStatic: false
-          };
-        } catch (e) {
-          return { ...movie, director: 'Unknown', isStatic: false };
+      const personIdPromises = filters.directors.map(dir => searchPersonByName(apiKey, dir));
+      const personIdResults = await Promise.all(personIdPromises);
+      const directorPersonIds = personIdResults.filter(id => id !== null);
+      
+      if (directorPersonIds.length > 0) {
+        const fetchPromises = directorPersonIds.map(personId => 
+          fetchFullDirectorFilmography(apiKey, personId, filters)
+        );
+        const resultsArrays = await Promise.all(fetchPromises);
+        allResults = resultsArrays.flat();
+        
+        // Deduplicate by ID (in case same movie returned multiple times)
+        const seenIds = new Set();
+        allResults = allResults.filter(movie => {
+          if (seenIds.has(movie.id)) return false;
+          seenIds.add(movie.id);
+          return true;
+        });
+        
+        return allResults;
+      } else {
+        return [];
+      }
+    } else {
+        // STANDARD DISCOVER LOGIC (Paginated)
+        let url = `${TMDB_BASE_URL}/discover/movie?api_key=${apiKey}&language=en-US&sort_by=${filters.sort === 'random' ? 'popularity.desc' : filters.sort}&page=${page}&vote_count.gte=200`;
+        
+        if (filters.genre !== 'all') {
+            url += `&with_genres=${filters.genre}`;
         }
-      })
-    );
 
-    return enrichedMovies;
+        if (filters.year !== 'all') {
+            const currentYear = new Date().getFullYear();
+            if (filters.year === 'old') {
+                 url += `&primary_release_date.lte=1939-12-31`;
+            } else {
+                 const decadeStart = parseInt(filters.year);
+                 const decadeEnd = Math.min(decadeStart + 9, currentYear); 
+                 url += `&primary_release_date.gte=${decadeStart}-01-01&primary_release_date.lte=${decadeEnd}-12-31`;
+            }
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+        if (!data.results) throw new Error("Invalid API Response");
+        
+        // Enrich discover results
+        const enrichedMovies = await Promise.all(
+            data.results.map(async (movie) => {
+                try {
+                    const creditRes = await fetch(`${TMDB_BASE_URL}/movie/${movie.id}/credits?api_key=${apiKey}`);
+                    const creditData = await creditRes.json();
+                    const director = creditData.crew?.find(p => p.job === 'Director')?.name || "Unknown";
+                    
+                    return {
+                        id: movie.id,
+                        title: movie.title,
+                        year: movie.release_date ? movie.release_date.split('-')[0] : 'N/A',
+                        poster_path: movie.poster_path,
+                        director: director,
+                        rating: movie.vote_average,
+                        overview: movie.overview,
+                        isStatic: false
+                    };
+                } catch (e) {
+                    return { ...movie, director: 'Unknown', isStatic: false };
+                }
+            })
+        );
+        return enrichedMovies;
+    }
   } catch (error) {
     console.error("Fetch error:", error);
     return [];
@@ -179,7 +320,6 @@ const fetchWithCredits = async (apiKey, page = 1, filters) => {
 };
 
 const Card = ({ movie, index, isFront, dragOffset, dragDirection, modeConfig }) => {
-  // SAFEGUARD: Return null if movie doesn't exist (protects against undefined errors)
   if (!movie) return null;
 
   const rotate = isFront ? dragOffset.x * 0.05 : 0;
@@ -243,7 +383,7 @@ const Card = ({ movie, index, isFront, dragOffset, dragDirection, modeConfig }) 
           </div>
         </div>
         <div className="space-y-1 text-sm text-zinc-300/90 mb-4">
-           <p><span className="text-zinc-500 uppercase text-[10px] font-bold tracking-wider">Director</span> {movie.director}</p>
+           <p><span className="text-zinc-500 uppercase text-[10px] font-bold tracking-wider">{movie.director}</span></p>
         </div>
         <p className="text-xs text-zinc-400 line-clamp-3 leading-relaxed max-w-prose opacity-80">
           {movie.overview}
@@ -254,118 +394,175 @@ const Card = ({ movie, index, isFront, dragOffset, dragDirection, modeConfig }) 
 };
 
 export default function App() {
-  // Initialize from localStorage if available
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('tmdb_api_key') || '');
   const [useStatic, setUseStatic] = useState(() => !localStorage.getItem('tmdb_api_key'));
+  const [appState, setAppState] = useState('menu'); 
+  const [currentMode, setCurrentMode] = useState('watched');
   
-  // Initialize app state from localStorage
-  const [appState, setAppState] = useState(() => {
-    const saved = localStorage.getItem('film_logger_appState');
-    return saved || 'menu';
-  }); 
-  const [currentMode, setCurrentMode] = useState(() => {
-    const saved = localStorage.getItem('film_logger_currentMode');
-    return saved || 'watched';
+  // --- CUSTOM LIST CREATION STATE ---
+  const [newListConfig, setNewListConfig] = useState({
+      name: '',
+      filters: {
+          genre: 'all',
+          year: 'all',
+          sort: 'popularity.desc',
+          directors: []
+      }
   });
-  
-  // --- FILTERS STATE ---
-  const [filters, setFilters] = useState(() => {
-    const saved = localStorage.getItem('film_logger_filters');
-    return saved ? JSON.parse(saved) : {
-      genre: 'all',
-      year: 'all',
-      sort: 'popularity.desc'
-    };
-  });
-  const [showFilters, setShowFilters] = useState(false);
 
-  const [movies, setMovies] = useState([]);
-  const [page, setPage] = useState(() => {
-    const saved = localStorage.getItem('film_logger_page');
-    return saved ? parseInt(saved) : 1;
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(() => {
-    const saved = localStorage.getItem('film_logger_currentIndex');
-    return saved ? parseInt(saved) : 0;
-  });
-  
-  // --- LISTS INITIALIZATION FROM LOCAL STORAGE ---
+  // --- LISTS STATE & METADATA ---
   const [lists, setLists] = useState(() => {
     const savedLists = localStorage.getItem('film_logger_lists');
-    return savedLists ? JSON.parse(savedLists) : { watched: [], watchlist: [], liked: [] };
+    if (savedLists) {
+        const parsed = JSON.parse(savedLists);
+        if(!parsed.watched) parsed.watched = [];
+        if(!parsed.watchlist) parsed.watchlist = [];
+        return parsed;
+    }
+    return { watched: [], watchlist: [] };
+  });
+  
+  const [customListMeta, setCustomListMeta] = useState(() => {
+      const savedMeta = localStorage.getItem('film_logger_custom_meta');
+      return savedMeta ? JSON.parse(savedMeta) : {};
   });
 
-  // --- SAVE LISTS TO LOCAL STORAGE ---
   useEffect(() => {
     localStorage.setItem('film_logger_lists', JSON.stringify(lists));
   }, [lists]);
 
-  // --- SAVE APP STATE TO LOCAL STORAGE ---
   useEffect(() => {
-    localStorage.setItem('film_logger_appState', appState);
-  }, [appState]);
+    localStorage.setItem('film_logger_custom_meta', JSON.stringify(customListMeta));
+  }, [customListMeta]);
 
-  useEffect(() => {
-    localStorage.setItem('film_logger_currentMode', currentMode);
-  }, [currentMode]);
+  // --- FILTERS STATE (Standard Modes) ---
+  const [filters, setFilters] = useState({
+    genre: 'all',
+    year: 'all',
+    sort: 'popularity.desc',
+    directors: []
+  });
+  const [showFilters, setShowFilters] = useState(false);
+  const [directorInput, setDirectorInput] = useState('');
+  const [showDirectorSuggestions, setShowDirectorSuggestions] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem('film_logger_filters', JSON.stringify(filters));
-  }, [filters]);
+  const [movies, setMovies] = useState([]);
+  const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  useEffect(() => {
-    localStorage.setItem('film_logger_page', page.toString());
-  }, [page]);
-
-  useEffect(() => {
-    localStorage.setItem('film_logger_currentIndex', currentIndex.toString());
-  }, [currentIndex]);
-
-  // --- MODAL STATE ---
+  // --- MODAL & UI STATE ---
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [showListPreview, setShowListPreview] = useState(false);
-
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [listToDelete, setListToDelete] = useState(null);
+  const [viewingListId, setViewingListId] = useState(null); 
+  const [showListPreview, setShowListPreview] = useState(false); 
+  const [showSettings, setShowSettings] = useState(false);
+  
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const containerRef = useRef(null);
-  const [showSettings, setShowSettings] = useState(false);
 
-  const activeConfig = MODES[currentMode];
-  const hasRestoredRef = useRef(false);
+  const activeConfig = getModeConfig(currentMode, customListMeta);
+  const processedIdsRef = useRef(new Set());
 
-  const loadMovies = useCallback(async (pageNum, reset = false) => {
+  useEffect(() => {
+    const ids = new Set();
+    Object.values(lists).forEach(list => {
+        if(list && Array.isArray(list)) {
+            list.forEach(movie => ids.add(movie.id));
+        }
+    });
+    processedIdsRef.current = ids;
+  }, [lists]);
+
+  // Get unique directors for autocomplete
+  const availableDirectors = useMemo(() => {
+    const directorsSet = new Set();
+    STATIC_MOVIES.forEach(movie => {
+      if (movie.director && movie.director !== 'Unknown') directorsSet.add(movie.director);
+    });
+    movies.forEach(movie => {
+      if (movie.director && movie.director !== 'Unknown') directorsSet.add(movie.director);
+    });
+    return Array.from(directorsSet).sort();
+  }, [movies]);
+
+  // --- REMOVE MOVIES IN CURRENT LIST FROM VIEW STACK ---
+  useEffect(() => {
+    if (movies.length > 0) {
+      const currentListIds = new Set(lists[currentMode]?.map(m => m.id) || []);
+      // Only filter if we find a match to avoid unnecessary re-renders
+      const needsFiltering = movies.some(m => currentListIds.has(m.id));
+      
+      if (needsFiltering) {
+         setMovies(prev => prev.filter(m => !currentListIds.has(m.id)));
+      }
+    }
+  }, [lists, currentMode, movies]);
+
+  // --- MOVIE LOADING ---
+  const loadMovies = useCallback(async (pageNum, reset = false, modeOverride = null, customFilters = null) => {
     setIsLoading(true);
     
     let newMovies = [];
+    const activeMode = modeOverride || currentMode;
+    // Use provided custom filters OR current state filters
+    const activeFilters = customFilters || filters; 
     
+    // Get movie IDs already in the CURRENT list to exclude
+    const existingMovieIds = new Set();
+    if (lists[activeMode]) {
+      lists[activeMode].forEach(movie => {
+        if (movie && movie.id) existingMovieIds.add(movie.id);
+      });
+    }
+    
+    // Get movie IDs currently in the stack to avoid duplicates during pagination
+    const stackMovieIds = reset ? new Set() : new Set(movies.map(m => m.id));
+
     if (useStatic) {
-        // --- OFFLINE FILTERING LOGIC ---
         let filteredStatic = [...STATIC_MOVIES];
         
-        // Genre Filter
-        if (filters.genre !== 'all') {
-            filteredStatic = filteredStatic.filter(m => m.genre_ids && m.genre_ids.includes(Number(filters.genre)));
+        // Genre
+        if (activeFilters.genre !== 'all') {
+            filteredStatic = filteredStatic.filter(m => m.genre_ids && m.genre_ids.includes(Number(activeFilters.genre)));
         }
-        // Year Filter (Approximate for static)
-        if (filters.year !== 'all') {
-            const y = parseInt(filters.year);
+        
+        // Year
+        if (activeFilters.year !== 'all') {
+            if (activeFilters.year === 'old') {
+                 filteredStatic = filteredStatic.filter(m => parseInt(m.year) < 1940);
+            } else {
+                 const y = parseInt(activeFilters.year);
+                 filteredStatic = filteredStatic.filter(m => {
+                    const mYear = parseInt(m.year);
+                    return mYear >= y && mYear < y + 10;
+                 });
+            }
+        }
+
+        // Director
+        if (activeFilters.directors && activeFilters.directors.length > 0) {
+            const filterDirectorsLower = activeFilters.directors.map(d => String(d).trim().toLowerCase());
             filteredStatic = filteredStatic.filter(m => {
-                const mYear = parseInt(m.year);
-                if (filters.year === 'old') return mYear < 1980;
-                return mYear >= y && mYear < y + 10;
+                if (!m.director) return false;
+                return filterDirectorsLower.includes(m.director.toLowerCase());
             });
         }
         
-        // Sort
-        if (filters.sort === 'vote_average.desc') {
+        // Deduplicate against both list and current stack
+        filteredStatic = filteredStatic.filter(m => !existingMovieIds.has(m.id) && !stackMovieIds.has(m.id));
+        
+        if (activeFilters.sort === 'random') {
+             filteredStatic = shuffleArray(filteredStatic);
+        } else if (activeFilters.sort === 'vote_average.desc') {
              filteredStatic.sort((a, b) => b.rating - a.rating);
-        } else if (filters.sort === 'primary_release_date.desc') {
+        } else if (activeFilters.sort === 'primary_release_date.desc') {
              filteredStatic.sort((a, b) => parseInt(b.year) - parseInt(a.year));
         } else {
-             // Default shuffle for popularity feel
-             filteredStatic.sort(() => Math.random() - 0.5);
+             filteredStatic = shuffleArray(filteredStatic);
         }
 
         if (pageNum === 1) {
@@ -375,40 +572,25 @@ export default function App() {
             return;
         }
     } else {
-        // --- API FILTERING LOGIC ---
         if (apiKey) {
-            newMovies = await fetchWithCredits(apiKey, pageNum, filters);
+            newMovies = await fetchWithCredits(apiKey, pageNum, activeFilters);
+            
+            if (activeFilters.sort === 'random') {
+                newMovies = shuffleArray(newMovies);
+            }
+            // Deduplicate against both list and current stack
+            newMovies = newMovies.filter(m => !existingMovieIds.has(m.id) && !stackMovieIds.has(m.id));
         }
     }
     
     if (reset) {
         setMovies(newMovies);
-        // Only reset currentIndex if not restoring from localStorage
-        // Check if we're restoring by seeing if appState is 'playing' and hasRestoredRef is set
-        if (!hasRestoredRef.current) {
-          setCurrentIndex(0);
-        }
+        setCurrentIndex(0);
     } else {
         setMovies(prev => [...prev, ...newMovies]);
     }
     setIsLoading(false);
-  }, [apiKey, useStatic, filters]);
-
-  // --- RESTORE STATE ON MOUNT ---
-  useEffect(() => {
-    // Only restore once on mount if we're in playing state
-    if (!hasRestoredRef.current && appState === 'playing' && movies.length === 0) {
-      hasRestoredRef.current = true; // Set flag before loading so loadMovies knows to preserve index
-      loadMovies(page, true);
-    }
-  }, [appState, loadMovies, page, movies.length]);
-
-  // --- CLAMP CURRENT INDEX TO VALID RANGE ---
-  useEffect(() => {
-    if (movies.length > 0 && currentIndex >= movies.length) {
-      setCurrentIndex(Math.max(0, movies.length - 1));
-    }
-  }, [movies.length, currentIndex]);
+  }, [apiKey, useStatic, filters, lists, currentMode, movies]); 
 
   const handleKeySubmit = (e) => {
     e.preventDefault();
@@ -423,15 +605,58 @@ export default function App() {
       localStorage.removeItem('tmdb_api_key');
       setApiKey('');
       setUseStatic(true);
-      // No need to close settings immediately, let user see it's cleared
   };
 
-  const selectMode = (modeKey) => {
-    setCurrentMode(modeKey);
-    setAppState('playing');
-    setPage(1);
-    hasRestoredRef.current = false; // Reset flag so currentIndex gets reset
-    loadMovies(1, true);
+  // --- ACTIONS ---
+
+  const startStandardMode = (modeKey) => {
+      setCurrentMode(modeKey);
+      setAppState('playing');
+      setPage(1);
+      loadMovies(1, true, modeKey); 
+  };
+
+  const openListCreator = () => {
+      setNewListConfig({
+          name: '',
+          filters: { genre: 'all', year: 'all', sort: 'popularity.desc', directors: [] }
+      });
+      setAppState('create_list');
+  };
+
+  const createAndStartCustomList = () => {
+      if (!newListConfig.name.trim()) {
+          alert("Please give your list a name.");
+          return;
+      }
+
+      const newId = `custom_${Date.now()}`;
+      setLists(prev => ({ ...prev, [newId]: [] }));
+      setCustomListMeta(prev => ({
+          ...prev,
+          [newId]: {
+              name: newListConfig.name,
+              createdAt: new Date().toISOString(),
+              filters: newListConfig.filters
+          }
+      }));
+
+      setCurrentMode(newId);
+      setAppState('playing');
+      setPage(1);
+      loadMovies(1, true, newId, newListConfig.filters);
+  };
+
+  const deleteCustomList = () => {
+      if(!listToDelete) return;
+      const newLists = { ...lists };
+      delete newLists[listToDelete];
+      setLists(newLists);
+      const newMeta = { ...customListMeta };
+      delete newMeta[listToDelete];
+      setCustomListMeta(newMeta);
+      setShowDeleteConfirm(false);
+      setListToDelete(null);
   };
 
   const returnToMenu = () => {
@@ -439,40 +664,61 @@ export default function App() {
     setDragOffset({ x: 0, y: 0 });
   };
 
+  const openViewList = (listId) => {
+      setViewingListId(listId);
+  };
+  
+  const closeViewList = () => {
+      setViewingListId(null);
+  };
+
   const finishSwipe = (direction) => {
-    // SAFEGUARD: Check if movie exists before processing
     const currentMovie = movies[currentIndex];
     if (!currentMovie) return;
 
     if (direction === 'right') {
-      setLists(prev => ({ ...prev, [currentMode]: [...prev[currentMode], currentMovie] }));
+      const isAlreadyInList = lists[currentMode]?.some(m => m.id === currentMovie.id);
+      if (!isAlreadyInList) {
+        setLists(prev => ({ ...prev, [currentMode]: [...(prev[currentMode] || []), currentMovie] }));
+      }
     }
     setDragOffset({ x: 0, y: 0 });
     const nextIndex = currentIndex + 1;
+    
+    if (nextIndex >= movies.length) {
+      setCurrentIndex(movies.length);
+      return;
+    }
+    
     setCurrentIndex(nextIndex);
     if (!useStatic && movies.length - nextIndex < 4 && !isLoading) {
         const nextPage = page + 1;
         setPage(nextPage);
-        loadMovies(nextPage, false);
+        
+        let filtersToUse = filters;
+        if (currentMode.startsWith('custom_')) {
+             filtersToUse = customListMeta[currentMode]?.filters || filters;
+        }
+        loadMovies(nextPage, false, currentMode, filtersToUse);
     }
   };
 
   const handleDragStart = (e) => {
     if (isLoading) return;
-    // SAFEGUARD: Don't start drag if index is invalid
     if (currentIndex >= movies.length) return;
-
     setIsDragging(true);
     const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
     const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
     setStartPos({ x: clientX, y: clientY });
   };
+
   const handleDragMove = (e) => {
     if (!isDragging) return;
     const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
     const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
     setDragOffset({ x: clientX - startPos.x, y: clientY - startPos.y });
   };
+
   const handleDragEnd = () => {
     setIsDragging(false);
     const threshold = 100; 
@@ -480,6 +726,7 @@ export default function App() {
     else if (dragOffset.x < -threshold) finishSwipe('left');
     else setDragOffset({ x: 0, y: 0 });
   };
+
   useEffect(() => {
     const handleKeyDown = (e) => {
         if(appState !== 'playing' || isLoading) return;
@@ -490,31 +737,33 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [appState, currentIndex, movies.length, isLoading]);
 
-  const downloadCSV = () => {
-    const currentList = lists[currentMode];
-    // Added 'tmdbID' as required by Letterboxd import format
+  const downloadCSV = (modeToExport = currentMode) => {
+    const currentList = lists[modeToExport];
+    if (!currentList || currentList.length === 0) return;
+
     let headers = ['tmdbID', 'Title', 'Year', 'Directors'];
     const escapeCsv = (text) => {
         if (typeof text === 'string' && (text.includes(',') || text.includes('"'))) return `"${text.replace(/"/g, '""')}"`;
         return text;
     };
-    // Included movie.id in the mapper
     let rowMapper = (movie) => [movie.id, escapeCsv(movie.title), movie.year, escapeCsv(movie.director)];
     
-    if (currentMode === 'watchlist') {
+    if (modeToExport === 'watchlist') {
         headers.push('Watchlist');
         rowMapper = (movie) => [movie.id, escapeCsv(movie.title), movie.year, escapeCsv(movie.director), 'true'];
-    } else if (currentMode === 'liked') {
-        headers.push('Like');
-        rowMapper = (movie) => [movie.id, escapeCsv(movie.title), movie.year, escapeCsv(movie.director), 'true'];
-    }
+    } 
+    
     const rows = currentList.map(rowMapper);
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `letterboxd_${currentMode}_export.csv`);
+    const fileName = modeToExport.startsWith('custom_') 
+        ? `list_${customListMeta[modeToExport]?.name.replace(/\s+/g, '_').toLowerCase()}.csv`
+        : `letterboxd_${modeToExport}_import.csv`;
+        
+    link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -525,11 +774,252 @@ export default function App() {
       setShowClearConfirm(false);
   };
 
+  const removeMovieFromList = (listId, movieId) => {
+      setLists(prev => ({
+          ...prev,
+          [listId]: prev[listId].filter(m => m.id !== movieId)
+      }));
+  };
+
+  // --- RENDER: CREATE LIST SCREEN ---
+  if (appState === 'create_list') {
+      return (
+          <div className="min-h-screen bg-zinc-950 text-white flex flex-col p-6 font-sans">
+              <div className="w-full max-w-md mx-auto">
+                  <div className="flex items-center mb-6">
+                      <button onClick={() => setAppState('menu')} className="p-2 -ml-2 hover:bg-zinc-900 rounded-full"><ChevronLeft /></button>
+                      <h2 className="text-2xl font-bold ml-2">New Custom List</h2>
+                  </div>
+
+                  <div className="space-y-6">
+                      <div>
+                          <label className="block text-sm font-bold text-zinc-400 mb-2">List Name</label>
+                          <input 
+                            type="text" 
+                            value={newListConfig.name}
+                            onChange={(e) => setNewListConfig({...newListConfig, name: e.target.value})}
+                            placeholder="e.g., Horror Marathon 2024"
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-white focus:outline-none focus:border-purple-500"
+                          />
+                      </div>
+
+                      <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+                          <div className="flex items-center space-x-2 text-purple-400 font-bold mb-4">
+                              <Filter size={18} />
+                              <span>Filter the Deck</span>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs text-zinc-500 uppercase font-bold mb-2">Sort By</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {SORTS.map(s => (
+                                        <button 
+                                            key={s.id} 
+                                            onClick={() => setNewListConfig({...newListConfig, filters: {...newListConfig.filters, sort: s.id}})} 
+                                            className={`px-3 py-1 rounded-full text-xs font-medium border ${newListConfig.filters.sort === s.id ? 'bg-white text-black border-white' : 'bg-zinc-950 text-zinc-400 border-zinc-800'}`}
+                                        >
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs text-zinc-500 uppercase font-bold mb-2">Genre</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {GENRES.map(g => (
+                                        <button 
+                                            key={g.id} 
+                                            onClick={() => setNewListConfig({...newListConfig, filters: {...newListConfig.filters, genre: g.id}})} 
+                                            className={`px-3 py-1 rounded-full text-xs font-medium border ${newListConfig.filters.genre === g.id ? 'bg-white text-black border-white' : 'bg-zinc-950 text-zinc-400 border-zinc-800'}`}
+                                        >
+                                            {g.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs text-zinc-500 uppercase font-bold mb-2">Decade</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {DECADES.map(d => (
+                                        <button 
+                                            key={d.id} 
+                                            onClick={() => setNewListConfig({...newListConfig, filters: {...newListConfig.filters, year: d.id}})} 
+                                            className={`px-3 py-1 rounded-full text-xs font-medium border ${newListConfig.filters.year === d.id ? 'bg-white text-black border-white' : 'bg-zinc-950 text-zinc-400 border-zinc-800'}`}
+                                        >
+                                            {d.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* DIRECTOR FILTER FOR CUSTOM LIST */}
+                            <div>
+                                <label className="block text-xs text-zinc-500 uppercase font-bold mb-2">Director</label>
+                                <div className="relative">
+                                    <input 
+                                        type="text" 
+                                        value={directorInput}
+                                        onChange={(e) => {
+                                            setDirectorInput(e.target.value);
+                                            setShowDirectorSuggestions(e.target.value.length > 0);
+                                        }}
+                                        onFocus={() => { if (directorInput.length > 0) setShowDirectorSuggestions(true); }}
+                                        onBlur={() => setTimeout(() => setShowDirectorSuggestions(false), 200)}
+                                        placeholder="Type director name..."
+                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2 px-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+                                    />
+                                    {showDirectorSuggestions && directorInput.length > 0 && (
+                                        <div className="absolute z-50 w-full mt-1 bg-zinc-900 border border-zinc-800 rounded-lg max-h-48 overflow-y-auto shadow-xl">
+                                            {availableDirectors
+                                                .filter(dir => dir.toLowerCase().includes(directorInput.toLowerCase()) && !newListConfig.filters.directors?.includes(dir))
+                                                .slice(0, 8)
+                                                .map(dir => (
+                                                    <button 
+                                                        key={dir} 
+                                                        onClick={() => {
+                                                            setNewListConfig({
+                                                                ...newListConfig, 
+                                                                filters: {
+                                                                    ...newListConfig.filters,
+                                                                    directors: [...(newListConfig.filters.directors || []), dir]
+                                                                }
+                                                            });
+                                                            setDirectorInput('');
+                                                            setShowDirectorSuggestions(false);
+                                                        }}
+                                                        className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
+                                                    >
+                                                        {dir}
+                                                    </button>
+                                                ))}
+                                                {/* Allow adding custom name if not found */}
+                                                <button 
+                                                    onClick={() => {
+                                                        setNewListConfig({
+                                                            ...newListConfig, 
+                                                            filters: {
+                                                                ...newListConfig.filters,
+                                                                directors: [...(newListConfig.filters.directors || []), directorInput]
+                                                            }
+                                                        });
+                                                        setDirectorInput('');
+                                                        setShowDirectorSuggestions(false);
+                                                    }}
+                                                    className="w-full text-left px-3 py-2 text-sm text-purple-400 hover:bg-zinc-800 transition-colors italic border-t border-zinc-800"
+                                                >
+                                                    Add "{directorInput}"
+                                                </button>
+                                        </div>
+                                    )}
+                                </div>
+                                {newListConfig.filters.directors && newListConfig.filters.directors.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        {newListConfig.filters.directors.map(dir => (
+                                            <div key={dir} className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-white text-black border border-white">
+                                                <span>{dir}</span>
+                                                <button 
+                                                    onClick={() => {
+                                                        setNewListConfig({
+                                                            ...newListConfig,
+                                                            filters: {
+                                                                ...newListConfig.filters,
+                                                                directors: newListConfig.filters.directors.filter(d => d !== dir)
+                                                            }
+                                                        });
+                                                    }}
+                                                    className="ml-1 hover:text-red-500 transition-colors"
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                          </div>
+                      </div>
+
+                      <button 
+                        onClick={createAndStartCustomList}
+                        className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 rounded-xl flex items-center justify-center space-x-2 transition-all"
+                      >
+                        <Play size={20} fill="currentColor" />
+                        <span>Start Swiping</span>
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )
+  }
+
   // --- RENDER: MENU ---
   if (appState === 'menu') {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6 font-sans animate-in fade-in duration-500">
+      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6 font-sans animate-in fade-in duration-500 relative">
         
+        {/* VIEW LIST MODAL */}
+        {viewingListId && (
+            <div className="absolute inset-0 z-50 bg-black/90 flex flex-col animate-in fade-in duration-200 backdrop-blur-sm">
+                <div className="p-4 flex items-center justify-between border-b border-white/10 bg-zinc-950">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                        {getModeConfig(viewingListId, customListMeta).icon}
+                        {getModeConfig(viewingListId, customListMeta).label}
+                    </h3>
+                    <button onClick={() => setViewingListId(null)} className="p-2 bg-zinc-900 rounded-full border border-zinc-800 text-zinc-400 hover:text-white">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                    {(!lists[viewingListId] || lists[viewingListId].length === 0) ? (
+                        <div className="h-full flex flex-col items-center justify-center text-zinc-500 opacity-50">
+                            <Film size={48} className="mb-2" />
+                            <p>No movies yet</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-3">
+                            {lists[viewingListId].map((m, i) => (
+                                <div key={`${m.id}-${i}`} className="flex items-center justify-between gap-3 bg-zinc-900/50 p-2 rounded-xl border border-white/5">
+                                     <div className="flex items-center gap-3 overflow-hidden">
+                                         <div className="w-10 h-14 bg-zinc-800 rounded-lg overflow-hidden shrink-0">
+                                            <img src={m.isStatic === false ? `${IMAGE_BASE_URL}${m.poster_path}` : m.poster} className="w-full h-full object-cover" />
+                                         </div>
+                                         <div className="overflow-hidden text-left">
+                                            <p className="font-bold text-sm truncate">{m.title}</p>
+                                            <p className="text-xs text-zinc-500">{m.year} • {m.director}</p>
+                                         </div>
+                                     </div>
+                                     <button 
+                                        onClick={() => removeMovieFromList(viewingListId, m.id)}
+                                        className="p-2 text-zinc-600 hover:text-red-500 transition-colors"
+                                     >
+                                         <Trash2 size={16} />
+                                     </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* DELETE LIST MODAL */}
+        {showDeleteConfirm && (
+           <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
+              <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 max-w-xs text-center">
+                 <h3 className="text-xl font-bold mb-2">Delete List?</h3>
+                 <p className="text-zinc-400 mb-6 text-sm">Delete "{customListMeta[listToDelete]?.name}"?</p>
+                 <div className="flex space-x-3">
+                    <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-3 rounded-xl bg-zinc-800 font-bold">Cancel</button>
+                    <button onClick={deleteCustomList} className="flex-1 py-3 rounded-xl bg-red-600 font-bold text-white">Delete</button>
+                 </div>
+              </div>
+           </div>
+        )}
+
         {/* API Settings Toggle */}
         <div className="absolute top-6 right-6">
             <button onClick={() => setShowSettings(!showSettings)} className="p-2 bg-zinc-900 rounded-full hover:bg-zinc-800 transition-colors border border-zinc-800">
@@ -537,46 +1027,62 @@ export default function App() {
             </button>
         </div>
         {showSettings && (
-            <div className="absolute top-20 right-6 w-72 bg-zinc-900 border border-zinc-800 p-4 rounded-xl shadow-xl z-50 animate-in slide-in-from-top-2">
-                <h3 className="font-bold mb-2 text-sm">API Settings</h3>
+            <div className="absolute top-20 right-6 w-80 bg-zinc-900 border border-zinc-800 p-4 rounded-xl shadow-xl z-50 animate-in slide-in-from-top-2">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-bold text-sm">API Configuration</h3>
+                    <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1">
+                        Get Key <ExternalLink size={10} />
+                    </a>
+                </div>
+                
                 <input 
                     type="text" 
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="Paste TMDB Key..." 
-                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg py-2 px-3 text-xs text-white mb-2"
+                    placeholder="Paste TMDB API Key (v3)..." 
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg py-2 px-3 text-xs text-white mb-3 focus:outline-none focus:border-green-500"
                 />
-                <button onClick={handleKeySubmit} className="w-full bg-green-600 text-white text-xs font-bold py-2 rounded-lg">
-                    Save & Go Online
+                <button onClick={handleKeySubmit} className="w-full bg-green-600 text-white text-xs font-bold py-2.5 rounded-lg hover:bg-green-500 transition-colors mb-3">
+                    Save & Connect
                 </button>
+
+                <div className="bg-zinc-950/50 rounded-lg p-3 border border-zinc-800/50 text-[10px] text-zinc-400 leading-relaxed">
+                    <p className="font-bold text-zinc-300 mb-1 flex items-center gap-1"><HelpCircle size={10} /> How to get a key:</p>
+                    <ol className="list-decimal ml-3 space-y-1">
+                        <li>Log in to <span className="text-zinc-300">TheMovieDB.org</span></li>
+                        <li>Go to <span className="text-zinc-300">Settings &gt; API</span></li>
+                        <li>Click <span className="text-zinc-300">Create</span> (Select "Developer")</li>
+                        <li>Accept terms & fill basics (URL can be localhost)</li>
+                        <li>Copy your <span className="text-zinc-300">API Key (v3 auth)</span></li>
+                    </ol>
+                </div>
                 
-                {/* Clear Key Button */}
                 {localStorage.getItem('tmdb_api_key') && (
-                    <button onClick={clearApiKey} className="w-full mt-2 bg-red-900/30 text-red-400 border border-red-900/50 text-xs font-bold py-2 rounded-lg hover:bg-red-900/50 transition-colors">
-                        Remove Key
+                    <button onClick={clearApiKey} className="w-full mt-3 text-red-400 text-xs hover:text-red-300 transition-colors underline">
+                        Disconnect Key
                     </button>
                 )}
 
-                {!apiKey && <p className="text-[10px] text-zinc-500 mt-2">Currently using Offline Mode (30 movies)</p>}
+                {!apiKey && <p className="text-[10px] text-zinc-500 mt-3 text-center border-t border-zinc-800 pt-2">Currently using Offline Mode (30 movies)</p>}
             </div>
         )}
 
         <div className="mb-8 text-center">
-           <p className="text-xs font-mono text-zinc-500 mb-2 uppercase tracking-widest">{useStatic ? 'OFFLINE' : 'ONLINE'} • {movies.length} CACHED</p>
-           <div className="flex items-center justify-center space-x-3">
+           <div className="flex items-center justify-center space-x-3 mb-2">
                 <FilmLoggerIcon className="text-blue-500 w-12 h-12" />
                 <h1 className="text-4xl font-bold tracking-tighter">Film<span className="text-blue-500">Logger</span></h1>
            </div>
+           <p className="text-xs font-mono text-zinc-500 uppercase tracking-widest">{useStatic ? 'OFFLINE' : 'ONLINE'} • {movies.length} CACHED</p>
         </div>
 
-        {/* FILTER SECTION */}
+        {/* FILTER SECTION (Standard Modes) */}
         <div className="w-full max-w-md mb-6 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
             <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => setShowFilters(!showFilters)}>
                 <div className="flex items-center space-x-2 text-sm font-bold text-zinc-300">
                     <Filter size={16} />
-                    <span>Discovery Filters</span>
+                    <span>Discovery Filters (Standard)</span>
                 </div>
-                <span className="text-xs text-zinc-500">{filters.genre === 'all' && filters.year === 'all' ? 'Default (Popular)' : 'Custom Active'}</span>
+                <span className="text-xs text-zinc-500">{filters.genre === 'all' && filters.year === 'all' && (!filters.directors || filters.directors.length === 0) ? 'Default' : 'Active'}</span>
             </div>
 
             {showFilters && (
@@ -585,7 +1091,7 @@ export default function App() {
                         <label className="block text-xs text-zinc-500 uppercase font-bold mb-2">Sort By</label>
                         <div className="flex flex-wrap gap-2">
                             {SORTS.map(s => (
-                                <button key={s.id} onClick={() => setFilters({...filters, sort: s.id})} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${filters.sort === s.id ? 'bg-white text-black border-white' : 'bg-zinc-950 text-zinc-400 border-zinc-800'}`}>{s.label}</button>
+                                <button key={s.id} onClick={() => setFilters({...filters, sort: s.id})} className={`px-2 py-1 rounded text-[10px] font-medium border ${filters.sort === s.id ? 'bg-white text-black' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{s.label}</button>
                             ))}
                         </div>
                     </div>
@@ -593,7 +1099,7 @@ export default function App() {
                         <label className="block text-xs text-zinc-500 uppercase font-bold mb-2">Genre</label>
                         <div className="flex flex-wrap gap-2">
                             {GENRES.map(g => (
-                                <button key={g.id} onClick={() => setFilters({...filters, genre: g.id})} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${filters.genre === g.id ? 'bg-white text-black border-white' : 'bg-zinc-950 text-zinc-400 border-zinc-800'}`}>{g.label}</button>
+                                <button key={g.id} onClick={() => setFilters({...filters, genre: g.id})} className={`px-2 py-1 rounded text-[10px] font-medium border ${filters.genre === g.id ? 'bg-white text-black' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{g.label}</button>
                             ))}
                         </div>
                     </div>
@@ -601,35 +1107,151 @@ export default function App() {
                         <label className="block text-xs text-zinc-500 uppercase font-bold mb-2">Decade</label>
                         <div className="flex flex-wrap gap-2">
                             {DECADES.map(d => (
-                                <button key={d.id} onClick={() => setFilters({...filters, year: d.id})} className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${filters.year === d.id ? 'bg-white text-black border-white' : 'bg-zinc-950 text-zinc-400 border-zinc-800'}`}>{d.label}</button>
+                                <button key={d.id} onClick={() => setFilters({...filters, year: d.id})} className={`px-2 py-1 rounded text-[10px] font-medium border ${filters.year === d.id ? 'bg-white text-black' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{d.label}</button>
                             ))}
                         </div>
+                    </div>
+
+                    {/* DIRECTOR FILTER FOR STANDARD MODE */}
+                    <div>
+                        <label className="block text-xs text-zinc-500 uppercase font-bold mb-2">Director</label>
+                        <div className="relative">
+                            <input 
+                                type="text" 
+                                value={directorInput}
+                                onChange={(e) => {
+                                    setDirectorInput(e.target.value);
+                                    setShowDirectorSuggestions(e.target.value.length > 0);
+                                }}
+                                onFocus={() => { if (directorInput.length > 0) setShowDirectorSuggestions(true); }}
+                                onBlur={() => setTimeout(() => setShowDirectorSuggestions(false), 200)}
+                                placeholder="Type director name..."
+                                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2 px-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600"
+                            />
+                            {showDirectorSuggestions && directorInput.length > 0 && (
+                                <div className="absolute z-50 w-full mt-1 bg-zinc-900 border border-zinc-800 rounded-lg max-h-48 overflow-y-auto shadow-xl">
+                                    {availableDirectors
+                                        .filter(dir => dir.toLowerCase().includes(directorInput.toLowerCase()) && !filters.directors?.includes(dir))
+                                        .slice(0, 8)
+                                        .map(dir => (
+                                            <button 
+                                                key={dir} 
+                                                onClick={() => {
+                                                    setFilters({
+                                                        ...filters, 
+                                                        directors: [...(filters.directors || []), dir]
+                                                    });
+                                                    setDirectorInput('');
+                                                    setShowDirectorSuggestions(false);
+                                                }}
+                                                className="w-full text-left px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
+                                            >
+                                                {dir}
+                                            </button>
+                                        ))}
+                                        <button 
+                                            onClick={() => {
+                                                setFilters({
+                                                    ...filters, 
+                                                    directors: [...(filters.directors || []), directorInput]
+                                                });
+                                                setDirectorInput('');
+                                                setShowDirectorSuggestions(false);
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-sm text-purple-400 hover:bg-zinc-800 transition-colors italic border-t border-zinc-800"
+                                        >
+                                            Add "{directorInput}"
+                                        </button>
+                                </div>
+                            )}
+                        </div>
+                        {filters.directors && filters.directors.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {filters.directors.map(dir => (
+                                    <div key={dir} className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-white text-black border border-white">
+                                        <span>{dir}</span>
+                                        <button 
+                                            onClick={() => {
+                                                setFilters({
+                                                    ...filters,
+                                                    directors: filters.directors.filter(d => d !== dir)
+                                                });
+                                            }}
+                                            className="ml-1 hover:text-red-500 transition-colors"
+                                        >
+                                            <X size={12} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
         </div>
 
         <div className="w-full max-w-md space-y-3">
-          {Object.values(MODES).map((mode) => (
-            <button key={mode.id} onClick={() => selectMode(mode.id)} className="w-full bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 hover:border-zinc-600 p-5 rounded-xl flex items-center justify-between group transition-all hover:scale-[1.02] active:scale-95">
-                <div className="flex items-center space-x-4">
-                <div className={`p-3 bg-white/5 ${mode.themeColor} rounded-xl`}>
-                    {mode.icon}
-                </div>
-                <div className="text-left">
-                    <h3 className="font-bold text-base">{mode.label}</h3>
-                </div>
-                </div>
-                <div className="text-zinc-600 group-hover:translate-x-1 transition-transform">→</div>
-            </button>
+          {Object.values(STANDARD_MODES).map((mode) => (
+            <div key={mode.id} className="flex items-center gap-2">
+                <button onClick={() => startStandardMode(mode.id)} className="flex-1 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 hover:border-zinc-600 p-4 rounded-xl flex items-center justify-between group transition-all">
+                    <div className="flex items-center space-x-4">
+                    <div className={`p-2 bg-white/5 ${mode.themeColor} rounded-lg`}>{mode.icon}</div>
+                    <div className="text-left">
+                        <h3 className="font-bold text-base">{mode.label}</h3>
+                        <p className="text-zinc-500 text-xs">{lists[mode.id].length} items</p>
+                    </div>
+                    </div>
+                    <div className="text-zinc-600 group-hover:translate-x-1 transition-transform">→</div>
+                </button>
+                <button onClick={() => setViewingListId(mode.id)} className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors">
+                    <Eye size={20} />
+                </button>
+            </div>
           ))}
         </div>
-        
-        <div className="mt-8">
-            <button onClick={() => setAppState('summary')} className="text-zinc-500 hover:text-white text-sm flex items-center space-x-2 transition-colors">
-                <FileSpreadsheet size={16} />
-                <span>Export & Summary</span>
-            </button>
+
+        {/* CUSTOM LISTS */}
+        <div className="pt-4 border-t border-zinc-800">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-zinc-400 text-sm uppercase tracking-wider">Custom Lists</h3>
+                <button onClick={openListCreator} className="text-purple-400 hover:text-purple-300 text-xs font-bold flex items-center space-x-1">
+                    <Plus size={14} />
+                    <span>CREATE NEW</span>
+                </button>
+            </div>
+
+            <div className="grid gap-3">
+                {Object.keys(customListMeta).length === 0 ? (
+                    <div onClick={openListCreator} className="border-2 border-dashed border-zinc-800 rounded-xl p-6 text-center text-zinc-600 hover:border-zinc-700 hover:text-zinc-500 cursor-pointer transition-colors">
+                        <p className="text-sm">No custom lists yet.</p>
+                        <p className="text-xs mt-1">Tap to create one</p>
+                    </div>
+                ) : (
+                    Object.entries(customListMeta).map(([id, meta]) => (
+                        <div key={id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex items-center justify-between group">
+                            <div className="flex items-center space-x-3 cursor-pointer flex-1" onClick={() => {
+                                setCurrentMode(id);
+                                setAppState('playing');
+                                setPage(1);
+                                loadMovies(1, true, id, meta.filters);
+                            }}>
+                                <div className="p-2 bg-purple-500/10 text-purple-500 rounded-lg">
+                                    <List size={18} />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-sm">{meta.name}</h4>
+                                    <p className="text-xs text-zinc-500">{lists[id]?.length || 0} items</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                                <button onClick={() => setViewingListId(id)} className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg"><Eye size={16} /></button>
+                                <button onClick={() => downloadCSV(id)} className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg"><Download size={16} /></button>
+                                <button onClick={() => { setListToDelete(id); setShowDeleteConfirm(true); }} className="p-2 text-zinc-500 hover:text-red-500 hover:bg-zinc-800 rounded-lg"><Trash2 size={16} /></button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
         </div>
       </div>
     );
@@ -638,38 +1260,64 @@ export default function App() {
   // --- RENDER: SUMMARY ---
   if (appState === 'summary') {
     const activeList = lists[currentMode];
+    const modeLabel = STANDARD_MODES[currentMode] ? STANDARD_MODES[currentMode].label : customListMeta[currentMode]?.name;
+
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6 font-sans relative">
         
-        {/* CONFIRMATION MODAL */}
+        {/* VIEW LIST MODAL (Summary) */}
+        {viewingListId && (
+            <div className="absolute inset-0 z-50 bg-black/90 flex flex-col animate-in fade-in duration-200 backdrop-blur-sm">
+                <div className="p-4 flex items-center justify-between border-b border-white/10 bg-zinc-950">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                        {getModeConfig(viewingListId, customListMeta).icon}
+                        {getModeConfig(viewingListId, customListMeta).label}
+                    </h3>
+                    <button onClick={closeViewList} className="p-2 bg-zinc-900 rounded-full border border-zinc-800 text-zinc-400 hover:text-white">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                    <div className="grid grid-cols-1 gap-3">
+                        {lists[viewingListId]?.map((m, i) => (
+                            <div key={`${m.id}-${i}`} className="flex items-center justify-between gap-3 bg-zinc-900/50 p-2 rounded-xl border border-white/5">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="w-12 h-16 bg-zinc-800 rounded-lg overflow-hidden shrink-0">
+                                        <img src={m.isStatic === false ? `${IMAGE_BASE_URL}${m.poster_path}` : m.poster} className="w-full h-full object-cover" />
+                                        </div>
+                                        <div className="overflow-hidden text-left">
+                                        <p className="font-bold text-sm truncate">{m.title}</p>
+                                        <p className="text-xs text-zinc-500">{m.year} • {m.director}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => removeMovieFromList(viewingListId, m.id)} className="p-2 text-zinc-600 hover:text-red-500 transition-colors">
+                                        <Trash2 size={16} />
+                                    </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        )}
+
         {showClearConfirm && (
            <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 animate-in fade-in duration-200">
-              <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 max-w-xs text-center shadow-2xl transform scale-100">
-                 <div className="w-12 h-12 bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <AlertTriangle size={24} />
-                 </div>
+              <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 max-w-xs text-center shadow-2xl">
                  <h3 className="text-xl font-bold mb-2 text-white">Clear List?</h3>
-                 <p className="text-zinc-400 mb-6 text-sm">This will remove all movies from your <span className="text-white font-bold">{MODES[currentMode].label}</span> list. This action cannot be undone.</p>
-                 <div className="flex space-x-3">
-                    <button onClick={() => setShowClearConfirm(false)} className="flex-1 py-3 rounded-xl bg-zinc-800 font-bold text-zinc-300 hover:bg-zinc-700 transition-colors">Cancel</button>
-                    <button onClick={confirmClear} className="flex-1 py-3 rounded-xl bg-red-600 font-bold text-white hover:bg-red-500 transition-colors">Clear</button>
+                 <div className="flex space-x-3 mt-6">
+                    <button onClick={() => setShowClearConfirm(false)} className="flex-1 py-3 rounded-xl bg-zinc-800 font-bold">Cancel</button>
+                    <button onClick={confirmClear} className="flex-1 py-3 rounded-xl bg-red-600 font-bold">Clear</button>
                  </div>
               </div>
            </div>
         )}
 
         <div className="w-full max-w-md bg-zinc-900 rounded-2xl p-6 shadow-2xl border border-zinc-800 text-center">
-           <div className="flex justify-center space-x-4 mb-6">
-                {Object.values(MODES).map(m => (
-                    <button key={m.id} onClick={() => setCurrentMode(m.id)} className={`p-2 rounded-lg transition-all ${currentMode === m.id ? `bg-white/10 ${m.themeColor}` : 'text-zinc-600 hover:text-zinc-400'}`}>
-                        {m.icon}
-                    </button>
-                ))}
-           </div>
-          <h2 className="text-2xl font-bold mb-2">{activeConfig.label}</h2>
-          <p className="text-zinc-400 mb-6">You have {activeList.length} movies in this list.</p>
+          <h2 className="text-2xl font-bold mb-2">{modeLabel}</h2>
+          <p className="text-zinc-400 mb-6">{activeList?.length || 0} movies collected.</p>
+          
           <div className="bg-zinc-950 rounded-xl p-4 mb-6 max-h-60 overflow-y-auto text-left border border-zinc-800 scrollbar-thin scrollbar-thumb-zinc-700">
-            {activeList.length === 0 ? <p className="text-center text-zinc-600 italic py-4">No movies added yet.</p> : (
+            {!activeList || activeList.length === 0 ? <p className="text-center text-zinc-600 italic py-4">List is empty.</p> : (
               <ul className="space-y-3">
                 {activeList.map((m, i) => (
                   <li key={i} className="flex items-center space-x-3 text-zinc-300">
@@ -678,7 +1326,7 @@ export default function App() {
                     </div>
                     <div className="overflow-hidden text-left">
                         <p className="truncate font-medium text-sm">{m.title}</p>
-                        <p className="text-zinc-600 text-xs">{m.year} • {m.director}</p>
+                        <p className="text-zinc-600 text-xs">{m.year}</p>
                     </div>
                   </li>
                 ))}
@@ -686,9 +1334,9 @@ export default function App() {
             )}
           </div>
           <div className="space-y-3">
-             {activeList.length > 0 && (
+             {activeList && activeList.length > 0 && (
                 <>
-                    <button onClick={downloadCSV} className={`w-full ${activeConfig.yesBg} text-white font-bold py-3 rounded-xl flex items-center justify-center space-x-2 hover:brightness-110 transition-all`}>
+                    <button onClick={() => downloadCSV(currentMode)} className={`w-full ${activeConfig.yesBg} text-white font-bold py-3 rounded-xl flex items-center justify-center space-x-2 hover:brightness-110 transition-all`}>
                     <FileSpreadsheet size={20} />
                     <span>Download CSV</span>
                     </button>
@@ -724,14 +1372,14 @@ export default function App() {
                   </button>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
-                  {lists[currentMode].length === 0 ? (
+                  {lists[currentMode]?.length === 0 ? (
                       <div className="h-full flex flex-col items-center justify-center text-zinc-500 opacity-50">
                           <Film size={48} className="mb-2" />
                           <p>No movies yet</p>
                       </div>
                   ) : (
                       <div className="grid grid-cols-1 gap-3">
-                          {lists[currentMode].filter(Boolean).map((m, i) => (
+                          {lists[currentMode]?.map((m, i) => (
                               <div key={i} className="flex items-center gap-3 bg-zinc-900/50 p-2 rounded-xl border border-white/5">
                                    <div className="w-12 h-16 bg-zinc-800 rounded-lg overflow-hidden shrink-0">
                                       <img src={m.isStatic === false ? `${IMAGE_BASE_URL}${m.poster_path}` : m.poster} className="w-full h-full object-cover" />
@@ -754,12 +1402,9 @@ export default function App() {
           {activeConfig.icon}
           <span className="font-bold text-lg tracking-tight hidden sm:inline">{activeConfig.label}</span>
         </div>
-        <button 
-            onClick={() => setShowListPreview(true)}
-            className="flex items-center space-x-2 bg-zinc-900 px-3 py-1 rounded-full text-sm font-medium border border-zinc-800 hover:bg-zinc-800 transition-colors active:scale-95"
-        >
+        <button onClick={() => setShowListPreview(true)} className="flex items-center space-x-2 bg-zinc-900 px-3 py-1 rounded-full text-sm font-medium border border-zinc-800">
             <List size={14} className="text-zinc-500" />
-            <span>{lists[currentMode].length}</span>
+            <span>{lists[currentMode]?.length || 0}</span>
         </button>
       </header>
 
@@ -779,7 +1424,6 @@ export default function App() {
              !isLoading && (
                  <div className="flex flex-col items-center justify-center h-full text-zinc-500">
                      <p>No more movies found.</p>
-                     {useStatic && <p className="text-xs mt-2 opacity-50">Try changing filters or using an API key.</p>}
                      <button onClick={returnToMenu} className="mt-4 text-white underline">Return to Menu</button>
                  </div>
              )
@@ -789,7 +1433,7 @@ export default function App() {
       <footer className="p-6 pb-8 flex justify-center items-center space-x-8 z-20">
         <button onClick={() => finishSwipe('left')} disabled={isLoading || movies.length === 0} className="w-16 h-16 rounded-full bg-zinc-900 border border-zinc-800 text-red-500 flex items-center justify-center shadow-lg hover:bg-red-500 hover:text-white hover:border-red-500 hover:scale-110 transition-all duration-200 disabled:opacity-50 disabled:scale-100"><X size={32} strokeWidth={3} /></button>
         <button onClick={() => finishSwipe('right')} disabled={isLoading || movies.length === 0} className={`w-16 h-16 rounded-full bg-zinc-900 border border-zinc-800 ${activeConfig.themeColor} flex items-center justify-center shadow-lg hover:${activeConfig.yesBg} hover:text-white hover:${activeConfig.yesBorder} hover:scale-110 transition-all duration-200 disabled:opacity-50 disabled:scale-100`}>
-          {currentMode === 'liked' ? <Heart size={32} strokeWidth={3} /> : <Check size={32} strokeWidth={3} />}
+          {currentMode.startsWith('custom_') ? <Plus size={32} strokeWidth={3} /> : (currentMode === 'liked' ? <Heart size={32} strokeWidth={3} /> : <Check size={32} strokeWidth={3} />)}
         </button>
       </footer>
     </div>
