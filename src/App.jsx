@@ -164,59 +164,6 @@ const shuffleArray = (array) => {
 };
 
 // --- API UTILS ---
-
-// 1. RAW DISCOVERY FETCH (Just gets the IDs/Basic Data)
-const fetchRawDiscovery = async (apiKey, page, filters) => {
-    let url = `${TMDB_BASE_URL}/discover/movie?api_key=${apiKey}&language=en-US&sort_by=${filters.sort === 'random' ? 'popularity.desc' : filters.sort}&page=${page}&vote_count.gte=200`;
-    
-    if (filters.genre !== 'all') {
-        url += `&with_genres=${filters.genre}`;
-    }
-    if (filters.year !== 'all') {
-        const currentYear = new Date().getFullYear();
-        if (filters.year === 'old') {
-             url += `&primary_release_date.lte=1939-12-31`;
-        } else {
-             const decadeStart = parseInt(filters.year);
-             const decadeEnd = Math.min(decadeStart + 9, currentYear); 
-             url += `&primary_release_date.gte=${decadeStart}-01-01&primary_release_date.lte=${decadeEnd}-12-31`;
-        }
-    }
-    const response = await fetch(url);
-    return await response.json();
-};
-
-// 2. ENRICHMENT (Takes a list of basic movie objects and adds Director)
-const enrichMovies = async (apiKey, movies) => {
-    const enriched = await Promise.all(
-        movies.map(async (movie) => {
-            try {
-                const creditRes = await fetch(`${TMDB_BASE_URL}/movie/${movie.id}/credits?api_key=${apiKey}`);
-                const creditData = await creditRes.json();
-                const director = creditData.crew?.find(p => p.job === 'Director')?.name || "Unknown";
-                
-                return {
-                    id: movie.id,
-                    title: movie.title,
-                    year: movie.release_date ? movie.release_date.split('-')[0] : 'N/A',
-                    poster_path: movie.poster_path,
-                    director: director,
-                    rating: movie.vote_average,
-                    overview: movie.overview,
-                    vote_count: movie.vote_count,
-                    genre_ids: movie.genre_ids,
-                    release_date: movie.release_date,
-                    isStatic: false
-                };
-            } catch (e) {
-                return { ...movie, director: 'Unknown', isStatic: false };
-            }
-        })
-    );
-    return enriched;
-};
-
-// 3. DIRECTOR FETCH (Specific Logic)
 const fetchFullDirectorFilmography = async (apiKey, personId, filters) => {
     try {
         const url = `${TMDB_BASE_URL}/person/${personId}/movie_credits?api_key=${apiKey}&language=en-US`;
@@ -276,6 +223,57 @@ const fetchFullDirectorFilmography = async (apiKey, personId, filters) => {
     }
 };
 
+// Helper: raw discovery fetch
+const fetchRawDiscovery = async (apiKey, page, filters) => {
+    let url = `${TMDB_BASE_URL}/discover/movie?api_key=${apiKey}&language=en-US&sort_by=${filters.sort === 'random' ? 'popularity.desc' : filters.sort}&page=${page}&vote_count.gte=200`;
+    
+    if (filters.genre !== 'all') {
+        url += `&with_genres=${filters.genre}`;
+    }
+    if (filters.year !== 'all') {
+        const currentYear = new Date().getFullYear();
+        if (filters.year === 'old') {
+             url += `&primary_release_date.lte=1939-12-31`;
+        } else {
+             const decadeStart = parseInt(filters.year);
+             const decadeEnd = Math.min(decadeStart + 9, currentYear); 
+             url += `&primary_release_date.gte=${decadeStart}-01-01&primary_release_date.lte=${decadeEnd}-12-31`;
+        }
+    }
+    const response = await fetch(url);
+    return await response.json();
+};
+
+// Helper: enrich list of raw movie objects with director info
+const enrichMovies = async (apiKey, movies) => {
+    const enriched = await Promise.all(
+        movies.map(async (movie) => {
+            try {
+                const creditRes = await fetch(`${TMDB_BASE_URL}/movie/${movie.id}/credits?api_key=${apiKey}`);
+                const creditData = await creditRes.json();
+                const director = creditData.crew?.find(p => p.job === 'Director')?.name || "Unknown";
+                
+                return {
+                    id: movie.id,
+                    title: movie.title,
+                    year: movie.release_date ? movie.release_date.split('-')[0] : 'N/A',
+                    poster_path: movie.poster_path,
+                    director: director,
+                    rating: movie.vote_average,
+                    overview: movie.overview,
+                    vote_count: movie.vote_count,
+                    genre_ids: movie.genre_ids,
+                    release_date: movie.release_date,
+                    isStatic: false
+                };
+            } catch (e) {
+                return { ...movie, director: 'Unknown', isStatic: false };
+            }
+        })
+    );
+    return enriched;
+};
+
 const Card = ({ movie, index, isFront, dragOffset, dragDirection, modeConfig }) => {
   if (!movie) return null;
 
@@ -295,7 +293,6 @@ const Card = ({ movie, index, isFront, dragOffset, dragDirection, modeConfig }) 
 
   const yesOpacity = isFront && dragDirection === 'right' ? Math.min(Math.abs(dragOffset.x) / 100, 1) : 0;
   const noOpacity = isFront && dragDirection === 'left' ? Math.min(Math.abs(dragOffset.x) / 100, 1) : 0;
-  // Calculate opacity for swipe-up (watchlist) logic
   const watchlistOpacity = isFront && dragDirection === 'up' ? Math.min(Math.abs(dragOffset.y) / 100, 1) : 0;
 
   const imageUrl = movie.isStatic === false 
@@ -329,8 +326,6 @@ const Card = ({ movie, index, isFront, dragOffset, dragDirection, modeConfig }) 
           >
             {modeConfig.noLabel}
           </div>
-          
-          {/* Swipe Up WATCHLIST Indicator */}
           <div 
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-4 border-blue-400 text-blue-400 font-bold text-2xl px-4 py-2 rounded pointer-events-none z-20 bg-black/40 backdrop-blur-sm shadow-lg whitespace-nowrap"
             style={{ opacity: watchlistOpacity }}
@@ -420,6 +415,7 @@ export default function App() {
 
   // --- MODAL & UI STATE ---
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearTargetId, setClearTargetId] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [listToDelete, setListToDelete] = useState(null);
   const [viewingListId, setViewingListId] = useState(null); 
@@ -460,9 +456,7 @@ export default function App() {
   useEffect(() => {
     if (movies.length > 0) {
       const currentListIds = new Set(lists[currentMode]?.map(m => m.id) || []);
-      // Only filter if we find a match to avoid unnecessary re-renders
       const needsFiltering = movies.some(m => currentListIds.has(m.id));
-      
       if (needsFiltering) {
          setMovies(prev => prev.filter(m => !currentListIds.has(m.id)));
       }
@@ -535,9 +529,8 @@ export default function App() {
         }
     } else {
         if (apiKey) {
-            // SPECIAL DIRECTOR LOGIC
             if (activeFilters.directors && Array.isArray(activeFilters.directors) && activeFilters.directors.length > 0) {
-                 // Director Mode: Fetch everything at once on Page 1, then stop.
+                 // Director Logic (Single massive fetch on page 1)
                  if (pageNum === 1) {
                      const personIdPromises = activeFilters.directors.map(dir => searchPersonByName(apiKey, dir));
                      const personIdResults = await Promise.all(personIdPromises);
@@ -549,36 +542,34 @@ export default function App() {
                         );
                         const resultsArrays = await Promise.all(fetchPromises);
                         let allResults = resultsArrays.flat();
-                        
-                        // Deduplicate
                         const seenIds = new Set();
                         allResults = allResults.filter(movie => {
                           if (seenIds.has(movie.id)) return false;
                           seenIds.add(movie.id);
                           return true;
                         });
-                        
                         newMovies = allResults.filter(m => !existingMovieIds.has(m.id) && !stackMovieIds.has(m.id));
+                        // CRITICAL: Simulate pagination by telling the app we are done if we are in Director Mode
+                        // by setting page to a high number or just returning empty on next calls.
+                        // We handle this by checking pageNum === 1 above.
                      }
                  } else {
-                     // If page > 1 in Director mode, we stop (since we loaded all in page 1)
                      setIsLoading(false);
                      return;
                  }
             } else {
-                 // STANDARD DISCOVERY LOGIC WITH REFILL
-                 // We need to loop pages until we have enough new movies
+                 // STANDARD / CUSTOM DISCOVERY WITH REFILL LOOP
                  let accumulatedMovies = [];
                  let currentPage = pageNum;
-                 const MAX_PAGES_TO_FETCH = 5; // Safety break
-                 const TARGET_SIZE = 10; // Minimum we want to add
+                 const MAX_PAGES_TO_FETCH = 7; // Aggressively search for non-duplicates
+                 const TARGET_SIZE = 10; 
                  
                  for (let i = 0; i < MAX_PAGES_TO_FETCH; i++) {
                      const data = await fetchRawDiscovery(apiKey, currentPage, activeFilters);
                      
                      if (!data.results || data.results.length === 0) break;
 
-                     // Initial filter for duplicates before enrichment to save API calls
+                     // Filter first to save enrichment API calls
                      const validCandidates = data.results.filter(m => !existingMovieIds.has(m.id) && !stackMovieIds.has(m.id));
                      
                      if (validCandidates.length > 0) {
@@ -586,8 +577,6 @@ export default function App() {
                          accumulatedMovies = [...accumulatedMovies, ...enriched];
                      }
                      
-                     // If we found movies on this page, increment page for next time
-                     // Note: If we filter EVERYTHING out, we still need to advance page
                      currentPage++; 
                      
                      if (accumulatedMovies.length >= TARGET_SIZE) break;
@@ -598,7 +587,6 @@ export default function App() {
                  // Update the page state so next fetch continues where we left off
                  setPage(currentPage);
                  
-                 // Random sort if needed
                  if (activeFilters.sort === 'random') {
                     newMovies = shuffleArray(newMovies);
                  }
@@ -630,8 +618,6 @@ export default function App() {
       setUseStatic(true);
   };
 
-  // --- ACTIONS ---
-
   const startStandardMode = (modeKey) => {
       setCurrentMode(modeKey);
       setAppState('playing');
@@ -652,7 +638,6 @@ export default function App() {
           alert("Please give your list a name.");
           return;
       }
-
       const newId = `custom_${Date.now()}`;
       setLists(prev => ({ ...prev, [newId]: [] }));
       setCustomListMeta(prev => ({
@@ -663,7 +648,6 @@ export default function App() {
               filters: newListConfig.filters
           }
       }));
-
       setCurrentMode(newId);
       setAppState('playing');
       setPage(1);
@@ -699,14 +683,12 @@ export default function App() {
     const currentMovie = movies[currentIndex];
     if (!currentMovie) return;
 
-    // Swipe Up Logic -> Add to Watchlist
     if (direction === 'up') {
         const isAlreadyInWatchlist = lists.watchlist?.some(m => m.id === currentMovie.id);
         if (!isAlreadyInWatchlist) {
             setLists(prev => ({ ...prev, watchlist: [...(prev.watchlist || []), currentMovie] }));
         }
     } 
-    // Swipe Right Logic -> Add to Current Mode (e.g. Watched or Custom)
     else if (direction === 'right') {
       const isAlreadyInList = lists[currentMode]?.some(m => m.id === currentMovie.id);
       if (!isAlreadyInList) {
@@ -723,15 +705,15 @@ export default function App() {
     }
     
     setCurrentIndex(nextIndex);
-    if (!useStatic && movies.length - nextIndex < 4 && !isLoading) {
-        const nextPage = page + 1;
-        // setPage(nextPage); // Handled inside loadMovies logic now
-        
+    if (!useStatic && movies.length - nextIndex < 8 && !isLoading) {
+        // Increased buffer threshold to 8 to ensure we always have cards
         let filtersToUse = filters;
         if (currentMode.startsWith('custom_')) {
              filtersToUse = customListMeta[currentMode]?.filters || filters;
         }
-        loadMovies(page, false, currentMode, filtersToUse);
+        // If Director mode, we only fetch once (page 1), so we pass page+1 which will be >1 and cause early return
+        // If Standard mode, page will be the last fetched page from the refill loop
+        loadMovies(page + 1, false, currentMode, filtersToUse);
     }
   };
 
@@ -743,18 +725,16 @@ export default function App() {
     const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
     setStartPos({ x: clientX, y: clientY });
   };
-
   const handleDragMove = (e) => {
     if (!isDragging) return;
     const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
     const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
     setDragOffset({ x: clientX - startPos.x, y: clientY - startPos.y });
   };
-
   const handleDragEnd = () => {
     setIsDragging(false);
     const threshold = 100; 
-    if (dragOffset.y < -threshold) finishSwipe('up'); // Negative Y is UP
+    if (dragOffset.y < -threshold) finishSwipe('up'); 
     else if (dragOffset.x > threshold) finishSwipe('right');
     else if (dragOffset.x < -threshold) finishSwipe('left');
     else setDragOffset({ x: 0, y: 0 });
@@ -781,12 +761,10 @@ export default function App() {
         return text;
     };
     let rowMapper = (movie) => [movie.id, escapeCsv(movie.title), movie.year, escapeCsv(movie.director)];
-    
     if (modeToExport === 'watchlist') {
         headers.push('Watchlist');
         rowMapper = (movie) => [movie.id, escapeCsv(movie.title), movie.year, escapeCsv(movie.director), 'true'];
     } 
-    
     const rows = currentList.map(rowMapper);
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -796,7 +774,6 @@ export default function App() {
     const fileName = modeToExport.startsWith('custom_') 
         ? `list_${customListMeta[modeToExport]?.name.replace(/\s+/g, '_').toLowerCase()}.csv`
         : `letterboxd_${modeToExport}_import.csv`;
-        
     link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
@@ -804,8 +781,11 @@ export default function App() {
   };
 
   const confirmClear = () => {
-      setLists(prev => ({ ...prev, [currentMode]: [] }));
-      setShowClearConfirm(false);
+      if (clearTargetId) {
+          setLists(prev => ({ ...prev, [clearTargetId]: [] }));
+          setShowClearConfirm(false);
+          setClearTargetId(null);
+      }
   };
 
   const removeMovieFromList = (listId, movieId) => {
@@ -1003,9 +983,17 @@ export default function App() {
                         {getModeConfig(viewingListId, customListMeta).icon}
                         {getModeConfig(viewingListId, customListMeta).label}
                     </h3>
-                    <button onClick={() => setViewingListId(null)} className="p-2 bg-zinc-900 rounded-full border border-zinc-800 text-zinc-400 hover:text-white">
-                        <X size={20} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => {
+                            setClearTargetId(viewingListId);
+                            setShowClearConfirm(true);
+                        }} className="p-2 text-red-500 hover:bg-zinc-900 rounded-full border border-transparent hover:border-red-900">
+                            <Trash2 size={18} />
+                        </button>
+                        <button onClick={() => setViewingListId(null)} className="p-2 bg-zinc-900 rounded-full border border-zinc-800 text-zinc-400 hover:text-white">
+                            <X size={20} />
+                        </button>
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4">
                     {(!lists[viewingListId] || lists[viewingListId].length === 0) ? (
@@ -1038,6 +1026,23 @@ export default function App() {
                     )}
                 </div>
             </div>
+        )}
+
+        {/* CLEAR LIST CONFIRM MODAL */}
+        {showClearConfirm && (
+           <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50">
+              <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 max-w-xs text-center shadow-2xl">
+                 <h3 className="text-xl font-bold mb-2 text-white">Clear {clearTargetId ? (STANDARD_MODES[clearTargetId]?.label || customListMeta[clearTargetId]?.name) : 'List'}?</h3>
+                 <p className="text-zinc-400 mb-6 text-sm">This will remove all movies from this list. This action cannot be undone.</p>
+                 <div className="flex space-x-3">
+                    <button onClick={() => {
+                        setShowClearConfirm(false);
+                        setClearTargetId(null);
+                    }} className="flex-1 py-3 rounded-xl bg-zinc-800 font-bold">Cancel</button>
+                    <button onClick={confirmClear} className="flex-1 py-3 rounded-xl bg-red-600 font-bold">Clear</button>
+                 </div>
+              </div>
+           </div>
         )}
 
         {/* DELETE LIST MODAL */}
@@ -1286,105 +1291,6 @@ export default function App() {
                     ))
                 )}
             </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- RENDER: SUMMARY ---
-  if (appState === 'summary') {
-    const activeList = lists[currentMode];
-    const modeLabel = STANDARD_MODES[currentMode] ? STANDARD_MODES[currentMode].label : customListMeta[currentMode]?.name;
-
-    return (
-      <div className="fixed inset-0 bg-zinc-950 text-white flex flex-col items-center justify-center p-6 font-sans relative">
-        
-        {/* VIEW LIST MODAL (Summary) */}
-        {viewingListId && (
-            <div className="absolute inset-0 z-50 bg-black/90 flex flex-col animate-in fade-in duration-200 backdrop-blur-sm">
-                <div className="p-4 flex items-center justify-between border-b border-white/10 bg-zinc-950">
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                        {getModeConfig(viewingListId, customListMeta).icon}
-                        {getModeConfig(viewingListId, customListMeta).label}
-                    </h3>
-                    <button onClick={closeViewList} className="p-2 bg-zinc-900 rounded-full border border-zinc-800 text-zinc-400 hover:text-white">
-                        <X size={20} />
-                    </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4">
-                    <div className="grid grid-cols-1 gap-3">
-                        {lists[viewingListId]?.map((m, i) => (
-                            <div key={`${m.id}-${i}`} className="flex items-center justify-between gap-3 bg-zinc-900/50 p-2 rounded-xl border border-white/5">
-                                    <div className="flex items-center gap-3 overflow-hidden">
-                                        <div className="w-12 h-16 bg-zinc-800 rounded-lg overflow-hidden shrink-0">
-                                        <img src={m.isStatic === false ? `${IMAGE_BASE_URL}${m.poster_path}` : m.poster} className="w-full h-full object-cover" />
-                                        </div>
-                                        <div className="overflow-hidden text-left">
-                                        <p className="font-bold text-sm truncate">{m.title}</p>
-                                        <p className="text-xs text-zinc-500">{m.year} • {m.director}</p>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => removeMovieFromList(viewingListId, m.id)} className="p-2 text-zinc-600 hover:text-red-500 transition-colors">
-                                        <Trash2 size={16} />
-                                    </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {showClearConfirm && (
-           <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 animate-in fade-in duration-200">
-              <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 max-w-xs text-center shadow-2xl">
-                 <h3 className="text-xl font-bold mb-2 text-white">Clear List?</h3>
-                 <div className="flex space-x-3 mt-6">
-                    <button onClick={() => setShowClearConfirm(false)} className="flex-1 py-3 rounded-xl bg-zinc-800 font-bold">Cancel</button>
-                    <button onClick={confirmClear} className="flex-1 py-3 rounded-xl bg-red-600 font-bold">Clear</button>
-                 </div>
-              </div>
-           </div>
-        )}
-
-        <div className="w-full max-w-md bg-zinc-900 rounded-2xl p-6 shadow-2xl border border-zinc-800 text-center">
-          <h2 className="text-2xl font-bold mb-2">{modeLabel}</h2>
-          <p className="text-zinc-400 mb-6">{activeList?.length || 0} movies collected.</p>
-          
-          <div className="bg-zinc-950 rounded-xl p-4 mb-6 max-h-60 overflow-y-auto text-left border border-zinc-800 scrollbar-thin scrollbar-thumb-zinc-700">
-            {!activeList || activeList.length === 0 ? <p className="text-center text-zinc-600 italic py-4">List is empty.</p> : (
-              <ul className="space-y-3">
-                {activeList.map((m, i) => (
-                  <li key={i} className="flex items-center space-x-3 text-zinc-300">
-                    <div className="w-8 h-12 bg-zinc-800 rounded overflow-hidden shrink-0">
-                        <img src={m.isStatic === false ? `${IMAGE_BASE_URL}${m.poster_path}` : m.poster} alt="" className="w-full h-full object-cover" />
-                    </div>
-                    <div className="overflow-hidden text-left">
-                        <p className="truncate font-medium text-sm">{m.title}</p>
-                        <p className="text-zinc-600 text-xs">{m.year}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div className="space-y-3">
-             {activeList && activeList.length > 0 && (
-                <>
-                    <button onClick={() => downloadCSV(currentMode)} className={`w-full ${activeConfig.yesBg} text-white font-bold py-3 rounded-xl flex items-center justify-center space-x-2 hover:brightness-110 transition-all`}>
-                    <FileSpreadsheet size={20} />
-                    <span>Download CSV</span>
-                    </button>
-                    <button onClick={() => setShowClearConfirm(true)} className="w-full bg-red-900/20 text-red-500 border border-red-900/50 font-bold py-3 rounded-xl flex items-center justify-center space-x-2 hover:bg-red-900/40 transition-all">
-                        <Trash2 size={20} />
-                        <span>Clear List</span>
-                    </button>
-                </>
-             )}
-            <button onClick={returnToMenu} className="w-full bg-zinc-800 text-zinc-300 font-bold py-3 rounded-xl flex items-center justify-center space-x-2 hover:bg-zinc-700 transition-colors">
-              <RotateCcw size={20} />
-              <span>Back to Menu</span>
-            </button>
-          </div>
         </div>
       </div>
     );
