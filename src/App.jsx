@@ -117,10 +117,9 @@ const STANDARD_MODES = {
   }
 };
 
-// Helper to get mode config (handles standard + custom)
+// Helper to get mode config
 const getModeConfig = (modeId, customMeta) => {
     if (STANDARD_MODES[modeId]) return STANDARD_MODES[modeId];
-    // Dynamic config for custom lists
     return {
         id: modeId,
         label: customMeta?.[modeId]?.name || 'Custom List',
@@ -165,14 +164,65 @@ const shuffleArray = (array) => {
 };
 
 // --- API UTILS ---
-// NEW: Fetch full filmography to avoid pagination issues with director filters
+
+// 1. RAW DISCOVERY FETCH (Just gets the IDs/Basic Data)
+const fetchRawDiscovery = async (apiKey, page, filters) => {
+    let url = `${TMDB_BASE_URL}/discover/movie?api_key=${apiKey}&language=en-US&sort_by=${filters.sort === 'random' ? 'popularity.desc' : filters.sort}&page=${page}&vote_count.gte=200`;
+    
+    if (filters.genre !== 'all') {
+        url += `&with_genres=${filters.genre}`;
+    }
+    if (filters.year !== 'all') {
+        const currentYear = new Date().getFullYear();
+        if (filters.year === 'old') {
+             url += `&primary_release_date.lte=1939-12-31`;
+        } else {
+             const decadeStart = parseInt(filters.year);
+             const decadeEnd = Math.min(decadeStart + 9, currentYear); 
+             url += `&primary_release_date.gte=${decadeStart}-01-01&primary_release_date.lte=${decadeEnd}-12-31`;
+        }
+    }
+    const response = await fetch(url);
+    return await response.json();
+};
+
+// 2. ENRICHMENT (Takes a list of basic movie objects and adds Director)
+const enrichMovies = async (apiKey, movies) => {
+    const enriched = await Promise.all(
+        movies.map(async (movie) => {
+            try {
+                const creditRes = await fetch(`${TMDB_BASE_URL}/movie/${movie.id}/credits?api_key=${apiKey}`);
+                const creditData = await creditRes.json();
+                const director = creditData.crew?.find(p => p.job === 'Director')?.name || "Unknown";
+                
+                return {
+                    id: movie.id,
+                    title: movie.title,
+                    year: movie.release_date ? movie.release_date.split('-')[0] : 'N/A',
+                    poster_path: movie.poster_path,
+                    director: director,
+                    rating: movie.vote_average,
+                    overview: movie.overview,
+                    vote_count: movie.vote_count,
+                    genre_ids: movie.genre_ids,
+                    release_date: movie.release_date,
+                    isStatic: false
+                };
+            } catch (e) {
+                return { ...movie, director: 'Unknown', isStatic: false };
+            }
+        })
+    );
+    return enriched;
+};
+
+// 3. DIRECTOR FETCH (Specific Logic)
 const fetchFullDirectorFilmography = async (apiKey, personId, filters) => {
     try {
         const url = `${TMDB_BASE_URL}/person/${personId}/movie_credits?api_key=${apiKey}&language=en-US`;
         const response = await fetch(url);
         const data = await response.json();
         
-        // Filter for 'Director' job immediately
         let movies = (data.crew || [])
             .filter(m => m.job === 'Director')
             .map(m => ({
@@ -180,7 +230,7 @@ const fetchFullDirectorFilmography = async (apiKey, personId, filters) => {
                 title: m.title,
                 year: m.release_date ? m.release_date.split('-')[0] : 'N/A',
                 poster_path: m.poster_path,
-                director: 'Selected Director', // We know the director
+                director: 'Selected Director', 
                 rating: m.vote_average,
                 overview: m.overview,
                 vote_count: m.vote_count,
@@ -189,17 +239,12 @@ const fetchFullDirectorFilmography = async (apiKey, personId, filters) => {
                 isStatic: false
             }));
 
-        // Apply Client-Side Filters
-        
-        // Lower vote count threshold for specific director searches (capture early/indie films)
         movies = movies.filter(m => m.vote_count >= 10); 
 
-        // Genre
         if (filters.genre !== 'all') {
             movies = movies.filter(m => m.genre_ids && m.genre_ids.includes(Number(filters.genre)));
         }
 
-        // Year
         if (filters.year !== 'all') {
             if (filters.year === 'old') {
                 movies = movies.filter(m => m.release_date && m.release_date < '1940-01-01');
@@ -214,7 +259,6 @@ const fetchFullDirectorFilmography = async (apiKey, personId, filters) => {
             }
         }
 
-        // Sort
         if (filters.sort === 'random') {
             movies = shuffleArray(movies);
         } else if (filters.sort === 'vote_average.desc') {
@@ -222,7 +266,6 @@ const fetchFullDirectorFilmography = async (apiKey, personId, filters) => {
         } else if (filters.sort === 'primary_release_date.desc') {
             movies.sort((a, b) => new Date(b.release_date || '') - new Date(a.release_date || ''));
         } else {
-            // Popularity is default
             movies.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
         }
 
@@ -231,92 +274,6 @@ const fetchFullDirectorFilmography = async (apiKey, personId, filters) => {
         console.error("Error fetching director credits", e);
         return [];
     }
-};
-
-const fetchWithCredits = async (apiKey, page = 1, filters) => {
-  try {
-    let allResults = [];
-
-    // DIRECTOR FILTER LOGIC (Load ALL movies at once on Page 1)
-    if (filters.directors && Array.isArray(filters.directors) && filters.directors.length > 0) {
-      // Only fetch on page 1. If page > 1, return empty to stop infinite scroll
-      if (page > 1) return [];
-
-      const personIdPromises = filters.directors.map(dir => searchPersonByName(apiKey, dir));
-      const personIdResults = await Promise.all(personIdPromises);
-      const directorPersonIds = personIdResults.filter(id => id !== null);
-      
-      if (directorPersonIds.length > 0) {
-        const fetchPromises = directorPersonIds.map(personId => 
-          fetchFullDirectorFilmography(apiKey, personId, filters)
-        );
-        const resultsArrays = await Promise.all(fetchPromises);
-        allResults = resultsArrays.flat();
-        
-        // Deduplicate by ID (in case same movie returned multiple times)
-        const seenIds = new Set();
-        allResults = allResults.filter(movie => {
-          if (seenIds.has(movie.id)) return false;
-          seenIds.add(movie.id);
-          return true;
-        });
-        
-        return allResults;
-      } else {
-        return [];
-      }
-    } else {
-        // STANDARD DISCOVER LOGIC (Paginated)
-        let url = `${TMDB_BASE_URL}/discover/movie?api_key=${apiKey}&language=en-US&sort_by=${filters.sort === 'random' ? 'popularity.desc' : filters.sort}&page=${page}&vote_count.gte=200`;
-        
-        if (filters.genre !== 'all') {
-            url += `&with_genres=${filters.genre}`;
-        }
-
-        if (filters.year !== 'all') {
-            const currentYear = new Date().getFullYear();
-            if (filters.year === 'old') {
-                 url += `&primary_release_date.lte=1939-12-31`;
-            } else {
-                 const decadeStart = parseInt(filters.year);
-                 const decadeEnd = Math.min(decadeStart + 9, currentYear); 
-                 url += `&primary_release_date.gte=${decadeStart}-01-01&primary_release_date.lte=${decadeEnd}-12-31`;
-            }
-        }
-
-        const response = await fetch(url);
-        const data = await response.json();
-        if (!data.results) throw new Error("Invalid API Response");
-        
-        // Enrich discover results
-        const enrichedMovies = await Promise.all(
-            data.results.map(async (movie) => {
-                try {
-                    const creditRes = await fetch(`${TMDB_BASE_URL}/movie/${movie.id}/credits?api_key=${apiKey}`);
-                    const creditData = await creditRes.json();
-                    const director = creditData.crew?.find(p => p.job === 'Director')?.name || "Unknown";
-                    
-                    return {
-                        id: movie.id,
-                        title: movie.title,
-                        year: movie.release_date ? movie.release_date.split('-')[0] : 'N/A',
-                        poster_path: movie.poster_path,
-                        director: director,
-                        rating: movie.vote_average,
-                        overview: movie.overview,
-                        isStatic: false
-                    };
-                } catch (e) {
-                    return { ...movie, director: 'Unknown', isStatic: false };
-                }
-            })
-        );
-        return enrichedMovies;
-    }
-  } catch (error) {
-    console.error("Fetch error:", error);
-    return [];
-  }
 };
 
 const Card = ({ movie, index, isFront, dragOffset, dragDirection, modeConfig }) => {
@@ -338,6 +295,8 @@ const Card = ({ movie, index, isFront, dragOffset, dragDirection, modeConfig }) 
 
   const yesOpacity = isFront && dragDirection === 'right' ? Math.min(Math.abs(dragOffset.x) / 100, 1) : 0;
   const noOpacity = isFront && dragDirection === 'left' ? Math.min(Math.abs(dragOffset.x) / 100, 1) : 0;
+  // Calculate opacity for swipe-up (watchlist) logic
+  const watchlistOpacity = isFront && dragDirection === 'up' ? Math.min(Math.abs(dragOffset.y) / 100, 1) : 0;
 
   const imageUrl = movie.isStatic === false 
     ? `${IMAGE_BASE_URL}${movie.poster_path}`
@@ -369,6 +328,14 @@ const Card = ({ movie, index, isFront, dragOffset, dragDirection, modeConfig }) 
             style={{ opacity: noOpacity }}
           >
             {modeConfig.noLabel}
+          </div>
+          
+          {/* Swipe Up WATCHLIST Indicator */}
+          <div 
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-4 border-blue-400 text-blue-400 font-bold text-2xl px-4 py-2 rounded pointer-events-none z-20 bg-black/40 backdrop-blur-sm shadow-lg whitespace-nowrap"
+            style={{ opacity: watchlistOpacity }}
+          >
+            WATCHLIST
           </div>
         </>
       )}
@@ -508,7 +475,6 @@ export default function App() {
     
     let newMovies = [];
     const activeMode = modeOverride || currentMode;
-    // Use provided custom filters OR current state filters
     const activeFilters = customFilters || filters; 
     
     // Get movie IDs already in the CURRENT list to exclude
@@ -525,12 +491,10 @@ export default function App() {
     if (useStatic) {
         let filteredStatic = [...STATIC_MOVIES];
         
-        // Genre
         if (activeFilters.genre !== 'all') {
             filteredStatic = filteredStatic.filter(m => m.genre_ids && m.genre_ids.includes(Number(activeFilters.genre)));
         }
         
-        // Year
         if (activeFilters.year !== 'all') {
             if (activeFilters.year === 'old') {
                  filteredStatic = filteredStatic.filter(m => parseInt(m.year) < 1940);
@@ -543,7 +507,6 @@ export default function App() {
             }
         }
 
-        // Director
         if (activeFilters.directors && activeFilters.directors.length > 0) {
             const filterDirectorsLower = activeFilters.directors.map(d => String(d).trim().toLowerCase());
             filteredStatic = filteredStatic.filter(m => {
@@ -552,7 +515,6 @@ export default function App() {
             });
         }
         
-        // Deduplicate against both list and current stack
         filteredStatic = filteredStatic.filter(m => !existingMovieIds.has(m.id) && !stackMovieIds.has(m.id));
         
         if (activeFilters.sort === 'random') {
@@ -573,13 +535,74 @@ export default function App() {
         }
     } else {
         if (apiKey) {
-            newMovies = await fetchWithCredits(apiKey, pageNum, activeFilters);
-            
-            if (activeFilters.sort === 'random') {
-                newMovies = shuffleArray(newMovies);
+            // SPECIAL DIRECTOR LOGIC
+            if (activeFilters.directors && Array.isArray(activeFilters.directors) && activeFilters.directors.length > 0) {
+                 // Director Mode: Fetch everything at once on Page 1, then stop.
+                 if (pageNum === 1) {
+                     const personIdPromises = activeFilters.directors.map(dir => searchPersonByName(apiKey, dir));
+                     const personIdResults = await Promise.all(personIdPromises);
+                     const directorPersonIds = personIdResults.filter(id => id !== null);
+                     
+                     if (directorPersonIds.length > 0) {
+                        const fetchPromises = directorPersonIds.map(personId => 
+                          fetchFullDirectorFilmography(apiKey, personId, activeFilters)
+                        );
+                        const resultsArrays = await Promise.all(fetchPromises);
+                        let allResults = resultsArrays.flat();
+                        
+                        // Deduplicate
+                        const seenIds = new Set();
+                        allResults = allResults.filter(movie => {
+                          if (seenIds.has(movie.id)) return false;
+                          seenIds.add(movie.id);
+                          return true;
+                        });
+                        
+                        newMovies = allResults.filter(m => !existingMovieIds.has(m.id) && !stackMovieIds.has(m.id));
+                     }
+                 } else {
+                     // If page > 1 in Director mode, we stop (since we loaded all in page 1)
+                     setIsLoading(false);
+                     return;
+                 }
+            } else {
+                 // STANDARD DISCOVERY LOGIC WITH REFILL
+                 // We need to loop pages until we have enough new movies
+                 let accumulatedMovies = [];
+                 let currentPage = pageNum;
+                 const MAX_PAGES_TO_FETCH = 5; // Safety break
+                 const TARGET_SIZE = 10; // Minimum we want to add
+                 
+                 for (let i = 0; i < MAX_PAGES_TO_FETCH; i++) {
+                     const data = await fetchRawDiscovery(apiKey, currentPage, activeFilters);
+                     
+                     if (!data.results || data.results.length === 0) break;
+
+                     // Initial filter for duplicates before enrichment to save API calls
+                     const validCandidates = data.results.filter(m => !existingMovieIds.has(m.id) && !stackMovieIds.has(m.id));
+                     
+                     if (validCandidates.length > 0) {
+                         const enriched = await enrichMovies(apiKey, validCandidates);
+                         accumulatedMovies = [...accumulatedMovies, ...enriched];
+                     }
+                     
+                     // If we found movies on this page, increment page for next time
+                     // Note: If we filter EVERYTHING out, we still need to advance page
+                     currentPage++; 
+                     
+                     if (accumulatedMovies.length >= TARGET_SIZE) break;
+                 }
+                 
+                 newMovies = accumulatedMovies;
+                 
+                 // Update the page state so next fetch continues where we left off
+                 setPage(currentPage);
+                 
+                 // Random sort if needed
+                 if (activeFilters.sort === 'random') {
+                    newMovies = shuffleArray(newMovies);
+                 }
             }
-            // Deduplicate against both list and current stack
-            newMovies = newMovies.filter(m => !existingMovieIds.has(m.id) && !stackMovieIds.has(m.id));
         }
     }
     
@@ -676,12 +699,21 @@ export default function App() {
     const currentMovie = movies[currentIndex];
     if (!currentMovie) return;
 
-    if (direction === 'right') {
+    // Swipe Up Logic -> Add to Watchlist
+    if (direction === 'up') {
+        const isAlreadyInWatchlist = lists.watchlist?.some(m => m.id === currentMovie.id);
+        if (!isAlreadyInWatchlist) {
+            setLists(prev => ({ ...prev, watchlist: [...(prev.watchlist || []), currentMovie] }));
+        }
+    } 
+    // Swipe Right Logic -> Add to Current Mode (e.g. Watched or Custom)
+    else if (direction === 'right') {
       const isAlreadyInList = lists[currentMode]?.some(m => m.id === currentMovie.id);
       if (!isAlreadyInList) {
         setLists(prev => ({ ...prev, [currentMode]: [...(prev[currentMode] || []), currentMovie] }));
       }
     }
+    
     setDragOffset({ x: 0, y: 0 });
     const nextIndex = currentIndex + 1;
     
@@ -693,13 +725,13 @@ export default function App() {
     setCurrentIndex(nextIndex);
     if (!useStatic && movies.length - nextIndex < 4 && !isLoading) {
         const nextPage = page + 1;
-        setPage(nextPage);
+        // setPage(nextPage); // Handled inside loadMovies logic now
         
         let filtersToUse = filters;
         if (currentMode.startsWith('custom_')) {
              filtersToUse = customListMeta[currentMode]?.filters || filters;
         }
-        loadMovies(nextPage, false, currentMode, filtersToUse);
+        loadMovies(page, false, currentMode, filtersToUse);
     }
   };
 
@@ -722,7 +754,8 @@ export default function App() {
   const handleDragEnd = () => {
     setIsDragging(false);
     const threshold = 100; 
-    if (dragOffset.x > threshold) finishSwipe('right');
+    if (dragOffset.y < -threshold) finishSwipe('up'); // Negative Y is UP
+    else if (dragOffset.x > threshold) finishSwipe('right');
     else if (dragOffset.x < -threshold) finishSwipe('left');
     else setDragOffset({ x: 0, y: 0 });
   };
@@ -732,6 +765,7 @@ export default function App() {
         if(appState !== 'playing' || isLoading) return;
         if (e.key === 'ArrowRight') finishSwipe('right');
         if (e.key === 'ArrowLeft') finishSwipe('left');
+        if (e.key === 'ArrowUp') finishSwipe('up');
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -784,7 +818,7 @@ export default function App() {
   // --- RENDER: CREATE LIST SCREEN ---
   if (appState === 'create_list') {
       return (
-          <div className="min-h-screen bg-zinc-950 text-white flex flex-col p-6 font-sans">
+          <div className="fixed inset-0 bg-zinc-950 text-white flex flex-col p-6 font-sans overflow-y-auto">
               <div className="w-full max-w-md mx-auto">
                   <div className="flex items-center mb-6">
                       <button onClick={() => setAppState('menu')} className="p-2 -ml-2 hover:bg-zinc-900 rounded-full"><ChevronLeft /></button>
@@ -959,7 +993,7 @@ export default function App() {
   // --- RENDER: MENU ---
   if (appState === 'menu') {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6 font-sans animate-in fade-in duration-500 relative">
+      <div className="fixed inset-0 bg-zinc-950 text-white flex flex-col items-center justify-center p-6 font-sans animate-in fade-in duration-500 overflow-y-auto">
         
         {/* VIEW LIST MODAL */}
         {viewingListId && (
@@ -1076,7 +1110,7 @@ export default function App() {
         </div>
 
         {/* FILTER SECTION (Standard Modes) */}
-        <div className="w-full max-w-md mb-6 bg-zinc-900/50 p-4 rounded-2xl border border-zinc-800">
+        <div className="w-full max-w-md mb-6 bg-zinc-900/30 p-4 rounded-2xl border border-zinc-800/50">
             <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => setShowFilters(!showFilters)}>
                 <div className="flex items-center space-x-2 text-sm font-bold text-zinc-300">
                     <Filter size={16} />
@@ -1263,7 +1297,7 @@ export default function App() {
     const modeLabel = STANDARD_MODES[currentMode] ? STANDARD_MODES[currentMode].label : customListMeta[currentMode]?.name;
 
     return (
-      <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-6 font-sans relative">
+      <div className="fixed inset-0 bg-zinc-950 text-white flex flex-col items-center justify-center p-6 font-sans relative">
         
         {/* VIEW LIST MODAL (Summary) */}
         {viewingListId && (
@@ -1358,7 +1392,7 @@ export default function App() {
 
   // --- RENDER: PLAYING ---
   return (
-    <div className="min-h-screen bg-zinc-950 text-white overflow-hidden flex flex-col font-sans relative">
+    <div className="fixed inset-0 bg-zinc-950 text-white overflow-hidden flex flex-col font-sans">
       {/* LIST PREVIEW MODAL */}
       {showListPreview && (
           <div className="absolute inset-0 z-50 bg-black/90 flex flex-col animate-in fade-in duration-200 backdrop-blur-sm">
