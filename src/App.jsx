@@ -258,21 +258,37 @@ export default function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('tmdb_api_key') || '');
   const [useStatic, setUseStatic] = useState(() => !localStorage.getItem('tmdb_api_key'));
   
-  const [appState, setAppState] = useState('menu'); 
-  const [currentMode, setCurrentMode] = useState('watched');
+  // Initialize app state from localStorage
+  const [appState, setAppState] = useState(() => {
+    const saved = localStorage.getItem('film_logger_appState');
+    return saved || 'menu';
+  }); 
+  const [currentMode, setCurrentMode] = useState(() => {
+    const saved = localStorage.getItem('film_logger_currentMode');
+    return saved || 'watched';
+  });
   
   // --- FILTERS STATE ---
-  const [filters, setFilters] = useState({
-    genre: 'all',
-    year: 'all',
-    sort: 'popularity.desc'
+  const [filters, setFilters] = useState(() => {
+    const saved = localStorage.getItem('film_logger_filters');
+    return saved ? JSON.parse(saved) : {
+      genre: 'all',
+      year: 'all',
+      sort: 'popularity.desc'
+    };
   });
   const [showFilters, setShowFilters] = useState(false);
 
   const [movies, setMovies] = useState([]);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => {
+    const saved = localStorage.getItem('film_logger_page');
+    return saved ? parseInt(saved) : 1;
+  });
   const [isLoading, setIsLoading] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    const saved = localStorage.getItem('film_logger_currentIndex');
+    return saved ? parseInt(saved) : 0;
+  });
   
   // --- LISTS INITIALIZATION FROM LOCAL STORAGE ---
   const [lists, setLists] = useState(() => {
@@ -285,6 +301,27 @@ export default function App() {
     localStorage.setItem('film_logger_lists', JSON.stringify(lists));
   }, [lists]);
 
+  // --- SAVE APP STATE TO LOCAL STORAGE ---
+  useEffect(() => {
+    localStorage.setItem('film_logger_appState', appState);
+  }, [appState]);
+
+  useEffect(() => {
+    localStorage.setItem('film_logger_currentMode', currentMode);
+  }, [currentMode]);
+
+  useEffect(() => {
+    localStorage.setItem('film_logger_filters', JSON.stringify(filters));
+  }, [filters]);
+
+  useEffect(() => {
+    localStorage.setItem('film_logger_page', page.toString());
+  }, [page]);
+
+  useEffect(() => {
+    localStorage.setItem('film_logger_currentIndex', currentIndex.toString());
+  }, [currentIndex]);
+
   // --- MODAL STATE ---
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showListPreview, setShowListPreview] = useState(false);
@@ -296,6 +333,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
 
   const activeConfig = MODES[currentMode];
+  const hasRestoredRef = useRef(false);
 
   const loadMovies = useCallback(async (pageNum, reset = false) => {
     setIsLoading(true);
@@ -345,12 +383,32 @@ export default function App() {
     
     if (reset) {
         setMovies(newMovies);
-        setCurrentIndex(0);
+        // Only reset currentIndex if not restoring from localStorage
+        // Check if we're restoring by seeing if appState is 'playing' and hasRestoredRef is set
+        if (!hasRestoredRef.current) {
+          setCurrentIndex(0);
+        }
     } else {
         setMovies(prev => [...prev, ...newMovies]);
     }
     setIsLoading(false);
   }, [apiKey, useStatic, filters]);
+
+  // --- RESTORE STATE ON MOUNT ---
+  useEffect(() => {
+    // Only restore once on mount if we're in playing state
+    if (!hasRestoredRef.current && appState === 'playing' && movies.length === 0) {
+      hasRestoredRef.current = true; // Set flag before loading so loadMovies knows to preserve index
+      loadMovies(page, true);
+    }
+  }, [appState, loadMovies, page, movies.length]);
+
+  // --- CLAMP CURRENT INDEX TO VALID RANGE ---
+  useEffect(() => {
+    if (movies.length > 0 && currentIndex >= movies.length) {
+      setCurrentIndex(Math.max(0, movies.length - 1));
+    }
+  }, [movies.length, currentIndex]);
 
   const handleKeySubmit = (e) => {
     e.preventDefault();
@@ -372,6 +430,7 @@ export default function App() {
     setCurrentMode(modeKey);
     setAppState('playing');
     setPage(1);
+    hasRestoredRef.current = false; // Reset flag so currentIndex gets reset
     loadMovies(1, true);
   };
 
