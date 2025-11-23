@@ -1,5 +1,3 @@
-Here is the converted text formatted as a clean, ready-to-use `README.md` file inside a code block.
-
 ````markdown
 # FilmLogger 🎬
 
