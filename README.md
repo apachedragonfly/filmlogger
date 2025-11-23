@@ -100,10 +100,3 @@ Contributions are welcome\! Please feel free to submit a Pull Request.
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
-
-```
-
-***
-
-**Next Step:** Would you like me to create a `LICENSE` file text or a `.gitignore` file tailored for a Vite/React project to go along with this README?
-```
