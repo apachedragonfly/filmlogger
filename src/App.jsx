@@ -415,6 +415,7 @@ export default function App() {
 
   // --- MODAL & UI STATE ---
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearTargetId, setClearTargetId] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [listToDelete, setListToDelete] = useState(null);
   const [viewingListId, setViewingListId] = useState(null); 
@@ -455,6 +456,7 @@ export default function App() {
   useEffect(() => {
     if (movies.length > 0) {
       const currentListIds = new Set(lists[currentMode]?.map(m => m.id) || []);
+      // Only filter if we find a match to avoid unnecessary re-renders
       const needsFiltering = movies.some(m => currentListIds.has(m.id));
       
       if (needsFiltering) {
@@ -469,6 +471,7 @@ export default function App() {
     
     let newMovies = [];
     const activeMode = modeOverride || currentMode;
+    // Use provided custom filters OR current state filters
     const activeFilters = customFilters || filters; 
     
     // Get movie IDs already in the CURRENT list to exclude
@@ -617,6 +620,8 @@ export default function App() {
       setUseStatic(true);
   };
 
+  // --- ACTIONS ---
+
   const startStandardMode = (modeKey) => {
       setCurrentMode(modeKey);
       setAppState('playing');
@@ -637,6 +642,7 @@ export default function App() {
           alert("Please give your list a name.");
           return;
       }
+
       const newId = `custom_${Date.now()}`;
       setLists(prev => ({ ...prev, [newId]: [] }));
       setCustomListMeta(prev => ({
@@ -647,6 +653,7 @@ export default function App() {
               filters: newListConfig.filters
           }
       }));
+
       setCurrentMode(newId);
       setAppState('playing');
       setPage(1);
@@ -1344,9 +1351,13 @@ export default function App() {
         {showClearConfirm && (
            <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 animate-in fade-in duration-200">
               <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 max-w-xs text-center shadow-2xl">
-                 <h3 className="text-xl font-bold mb-2 text-white">Clear List?</h3>
-                 <div className="flex space-x-3 mt-6">
-                    <button onClick={() => setShowClearConfirm(false)} className="flex-1 py-3 rounded-xl bg-zinc-800 font-bold">Cancel</button>
+                 <h3 className="text-xl font-bold mb-2 text-white">Clear {clearTargetId ? (STANDARD_MODES[clearTargetId]?.label || customListMeta[clearTargetId]?.name) : 'List'}?</h3>
+                 <p className="text-zinc-400 mb-6 text-sm">This will remove all movies from this list. This action cannot be undone.</p>
+                 <div className="flex space-x-3">
+                    <button onClick={() => {
+                        setShowClearConfirm(false);
+                        setClearTargetId(null);
+                    }} className="flex-1 py-3 rounded-xl bg-zinc-800 font-bold">Cancel</button>
                     <button onClick={confirmClear} className="flex-1 py-3 rounded-xl bg-red-600 font-bold">Clear</button>
                  </div>
               </div>
