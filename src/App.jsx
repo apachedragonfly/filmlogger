@@ -415,7 +415,6 @@ export default function App() {
 
   // --- MODAL & UI STATE ---
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [clearTargetId, setClearTargetId] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [listToDelete, setListToDelete] = useState(null);
   const [viewingListId, setViewingListId] = useState(null); 
@@ -457,6 +456,7 @@ export default function App() {
     if (movies.length > 0) {
       const currentListIds = new Set(lists[currentMode]?.map(m => m.id) || []);
       const needsFiltering = movies.some(m => currentListIds.has(m.id));
+      
       if (needsFiltering) {
          setMovies(prev => prev.filter(m => !currentListIds.has(m.id)));
       }
@@ -485,10 +485,12 @@ export default function App() {
     if (useStatic) {
         let filteredStatic = [...STATIC_MOVIES];
         
+        // Genre
         if (activeFilters.genre !== 'all') {
             filteredStatic = filteredStatic.filter(m => m.genre_ids && m.genre_ids.includes(Number(activeFilters.genre)));
         }
         
+        // Year
         if (activeFilters.year !== 'all') {
             if (activeFilters.year === 'old') {
                  filteredStatic = filteredStatic.filter(m => parseInt(m.year) < 1940);
@@ -501,6 +503,7 @@ export default function App() {
             }
         }
 
+        // Director
         if (activeFilters.directors && activeFilters.directors.length > 0) {
             const filterDirectorsLower = activeFilters.directors.map(d => String(d).trim().toLowerCase());
             filteredStatic = filteredStatic.filter(m => {
@@ -509,6 +512,7 @@ export default function App() {
             });
         }
         
+        // Deduplicate against both list and current stack
         filteredStatic = filteredStatic.filter(m => !existingMovieIds.has(m.id) && !stackMovieIds.has(m.id));
         
         if (activeFilters.sort === 'random') {
@@ -549,9 +553,6 @@ export default function App() {
                           return true;
                         });
                         newMovies = allResults.filter(m => !existingMovieIds.has(m.id) && !stackMovieIds.has(m.id));
-                        // CRITICAL: Simulate pagination by telling the app we are done if we are in Director Mode
-                        // by setting page to a high number or just returning empty on next calls.
-                        // We handle this by checking pageNum === 1 above.
                      }
                  } else {
                      setIsLoading(false);
@@ -583,8 +584,6 @@ export default function App() {
                  }
                  
                  newMovies = accumulatedMovies;
-                 
-                 // Update the page state so next fetch continues where we left off
                  setPage(currentPage);
                  
                  if (activeFilters.sort === 'random') {
@@ -1242,6 +1241,9 @@ export default function App() {
                     </div>
                     <div className="text-zinc-600 group-hover:translate-x-1 transition-transform">→</div>
                 </button>
+                <button onClick={() => downloadCSV(mode.id)} className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors">
+                    <Download size={20} />
+                </button>
                 <button onClick={() => setViewingListId(mode.id)} className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors">
                     <Eye size={20} />
                 </button>
@@ -1291,6 +1293,108 @@ export default function App() {
                     ))
                 )}
             </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDER: SUMMARY ---
+  if (appState === 'summary') {
+    const activeList = lists[currentMode];
+    const modeLabel = STANDARD_MODES[currentMode] ? STANDARD_MODES[currentMode].label : customListMeta[currentMode]?.name;
+
+    return (
+      <div className="fixed inset-0 bg-zinc-950 text-white flex flex-col items-center justify-center p-6 font-sans relative">
+        
+        {/* VIEW LIST MODAL (Summary) */}
+        {viewingListId && (
+            <div className="absolute inset-0 z-50 bg-black/90 flex flex-col animate-in fade-in duration-200 backdrop-blur-sm">
+                <div className="p-4 flex items-center justify-between border-b border-white/10 bg-zinc-950">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                        {getModeConfig(viewingListId, customListMeta).icon}
+                        {getModeConfig(viewingListId, customListMeta).label}
+                    </h3>
+                    <button onClick={closeViewList} className="p-2 bg-zinc-900 rounded-full border border-zinc-800 text-zinc-400 hover:text-white">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                    <div className="grid grid-cols-1 gap-3">
+                        {lists[viewingListId]?.map((m, i) => (
+                            <div key={`${m.id}-${i}`} className="flex items-center justify-between gap-3 bg-zinc-900/50 p-2 rounded-xl border border-white/5">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="w-12 h-16 bg-zinc-800 rounded-lg overflow-hidden shrink-0">
+                                        <img src={m.isStatic === false ? `${IMAGE_BASE_URL}${m.poster_path}` : m.poster} className="w-full h-full object-cover" />
+                                        </div>
+                                        <div className="overflow-hidden text-left">
+                                        <p className="font-bold text-sm truncate">{m.title}</p>
+                                        <p className="text-xs text-zinc-500">{m.year} • {m.director}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => removeMovieFromList(viewingListId, m.id)} className="p-2 text-zinc-600 hover:text-red-500 transition-colors">
+                                        <Trash2 size={16} />
+                                    </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {showClearConfirm && (
+           <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 animate-in fade-in duration-200">
+              <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 max-w-xs text-center shadow-2xl">
+                 <h3 className="text-xl font-bold mb-2 text-white">Clear List?</h3>
+                 <div className="flex space-x-3 mt-6">
+                    <button onClick={() => setShowClearConfirm(false)} className="flex-1 py-3 rounded-xl bg-zinc-800 font-bold">Cancel</button>
+                    <button onClick={confirmClear} className="flex-1 py-3 rounded-xl bg-red-600 font-bold">Clear</button>
+                 </div>
+              </div>
+           </div>
+        )}
+
+        <div className="w-full max-w-md bg-zinc-900 rounded-2xl p-6 shadow-2xl border border-zinc-800 text-center">
+          <h2 className="text-2xl font-bold mb-2">{modeLabel}</h2>
+          <p className="text-zinc-400 mb-6">{activeList?.length || 0} movies collected.</p>
+          
+          <div className="bg-zinc-950 rounded-xl p-4 mb-6 max-h-60 overflow-y-auto text-left border border-zinc-800 scrollbar-thin scrollbar-thumb-zinc-700">
+            {!activeList || activeList.length === 0 ? <p className="text-center text-zinc-600 italic py-4">List is empty.</p> : (
+              <ul className="space-y-3">
+                {activeList.map((m, i) => (
+                  <li key={i} className="flex items-center space-x-3 text-zinc-300">
+                    <div className="w-8 h-12 bg-zinc-800 rounded overflow-hidden shrink-0">
+                        <img src={m.isStatic === false ? `${IMAGE_BASE_URL}${m.poster_path}` : m.poster} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="overflow-hidden text-left">
+                        <p className="truncate font-medium text-sm">{m.title}</p>
+                        <p className="text-zinc-600 text-xs">{m.year}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="space-y-3">
+             {activeList && activeList.length > 0 && (
+                <>
+                    <button onClick={() => downloadCSV(currentMode)} className={`w-full ${activeConfig.yesBg} text-white font-bold py-3 rounded-xl flex items-center justify-center space-x-2 hover:brightness-110 transition-all`}>
+                    <FileSpreadsheet size={20} />
+                    <span>Download CSV</span>
+                    </button>
+                    <button onClick={() => {
+                        setClearTargetId(currentMode);
+                        setShowClearConfirm(true);
+                    }} className="w-full bg-red-900/20 text-red-500 border border-red-900/50 font-bold py-3 rounded-xl flex items-center justify-center space-x-2 hover:bg-red-900/40 transition-all">
+                        <Trash2 size={20} />
+                        <span>Clear List</span>
+                    </button>
+                </>
+             )}
+            <button onClick={returnToMenu} className="w-full bg-zinc-800 text-zinc-300 font-bold py-3 rounded-xl flex items-center justify-center space-x-2 hover:bg-zinc-700 transition-colors">
+              <RotateCcw size={20} />
+              <span>Back to Menu</span>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1379,3 +1483,5 @@ export default function App() {
     </div>
   );
 }
+
+
