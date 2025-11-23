@@ -1,4 +1,3 @@
-````markdown
 # FilmLogger 🎬
 
 FilmLogger is a gamified, "Tinder-style" web application designed for movie lovers and Letterboxd power users. It streamlines the process of discovering, logging, and curating films by turning data entry into a fast, engaging swipe interface.
@@ -42,7 +41,6 @@ FilmLogger is a gamified, "Tinder-style" web application designed for movie love
    ```bash
    git clone [https://github.com/YOUR_USERNAME/film-logger.git](https://github.com/YOUR_USERNAME/film-logger.git)
    cd film-logger
-````
 
 2.  **Install dependencies:**
 
